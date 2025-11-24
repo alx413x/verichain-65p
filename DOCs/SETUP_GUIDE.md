@@ -2,7 +2,7 @@
 
 这是一个基于以太坊智能合约的产品生命周期管理 dApp。
 
-## 🚀 快速开始
+## 快速开始
 
 ### 前置要求
 
@@ -95,9 +95,9 @@ npm run dev
 
 ---
 
-## 📱 连接 MetaMask
+## 连接 MetaMask
 
-### ✅ **可以在本地运行时连接 MetaMask！**
+### **可以在本地运行时连接 MetaMask！**
 
 **不需要部署到 Sepolia 测试网**。本地 Hardhat 节点完全支持 MetaMask 连接。
 
@@ -116,7 +116,7 @@ npm run dev
 
 ---
 
-## 🎯 使用指南
+## 使用指南
 
 ### 1. Manufacturer (制造商)
 - 注册新产品
@@ -136,7 +136,7 @@ npm run dev
 
 ---
 
-## 🔧 常见问题
+## 常见问题
 
 ### Q: MetaMask 显示 "错误的网络"
 A: 确保切换到 "Localhost 8545" 网络
@@ -155,7 +155,7 @@ A: 检查 `public/deployed.json` 和 `public/abis/*.json` 是否存在
 
 ---
 
-## 📁 项目结构
+## 项目结构
 
 ```
 ├── contractsLogic/           # 智能合约
@@ -175,7 +175,7 @@ A: 检查 `public/deployed.json` 和 `public/abis/*.json` 是否存在
 
 ---
 
-## 🛠️ 可用命令
+## 可用命令
 
 ```bash
 npm run dev              # 启动前端开发服务器
@@ -188,7 +188,7 @@ bash setup-artifacts.sh  # 复制合约文件到 public/
 
 ---
 
-## 📚 技术栈
+## 技术栈
 
 - **前端:** React 19, Vite 7, Tailwind CSS
 - **区块链:** Hardhat, Ethers.js v6, Solidity 0.8.20
@@ -196,7 +196,7 @@ bash setup-artifacts.sh  # 复制合约文件到 public/
 
 ---
 
-## 🎉 开发流程
+## 开发流程
 
 每次开发时:
 
@@ -208,7 +208,7 @@ bash setup-artifacts.sh  # 复制合约文件到 public/
 
 ---
 
-## ⚠️ 注意事项
+## 注意事项
 
 - **本地节点重启后**，所有链上数据会丢失，需要重新部署
 - **合约地址会变化**，记得重新复制 artifacts
@@ -217,7 +217,7 @@ bash setup-artifacts.sh  # 复制合约文件到 public/
 
 ---
 
-## 📝 下一步
+## 下一步
 
 如果要部署到测试网 (Sepolia):
 

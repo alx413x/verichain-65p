@@ -1,6 +1,6 @@
-# 🚀 VeriChain Passport - 快速启动卡片
+# VeriChain Passport - 快速启动卡片
 
-## ⚡ 30秒快速启动
+## 30秒快速启动
 
 ```bash
 # 终端 1 - 启动区块链 (保持运行)
@@ -14,7 +14,7 @@ npm run dev
 
 ---
 
-## 🔐 MetaMask 快速配置
+## MetaMask 快速配置
 
 ### 添加网络:
 - **网络名:** Localhost 8545
@@ -27,7 +27,7 @@ npm run dev
 
 ---
 
-## 📝 常用命令
+## 常用命令
 
 ```bash
 npm run chain          # 启动本地区块链
@@ -39,7 +39,7 @@ bash setup-artifacts.sh # 复制 artifacts
 
 ---
 
-## 🔄 重启流程
+## 重启流程
 
 如果重启了区块链节点:
 
@@ -52,7 +52,7 @@ bash setup-artifacts.sh     # 复制文件
 
 ---
 
-## 📂 重要文件位置
+## 重要文件位置
 
 - **合约源码:** `contractsLogic/contracts/`
 - **部署脚本:** `contractsLogic/scripts/deploy.cjs`
@@ -62,7 +62,7 @@ bash setup-artifacts.sh     # 复制文件
 
 ---
 
-## ✅ 检查清单
+## 检查清单
 
 - [ ] `npm run chain` 正在运行
 - [ ] `npm run dev` 正在运行
@@ -72,7 +72,7 @@ bash setup-artifacts.sh     # 复制文件
 
 ---
 
-## 🆘 快速故障排除
+## 快速故障排除
 
 | 问题 | 解决方案 |
 |------|---------|

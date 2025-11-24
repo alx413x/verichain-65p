@@ -1,6 +1,6 @@
 # MetaMask 本地连接配置指南
 
-## 📝 步骤 1: 添加本地网络到 MetaMask
+## 步骤 1: 添加本地网络到 MetaMask
 
 1. 打开 MetaMask 扩展
 2. 点击顶部的网络下拉菜单
@@ -17,7 +17,7 @@
 
 5. 点击 **"保存"**
 
-## 🔑 步骤 2: 导入测试账户
+## 步骤 2: 导入测试账户
 
 Hardhat 本地节点提供了预配置的测试账户。您可以使用以下任一账户:
 
@@ -39,19 +39,19 @@ Hardhat 本地节点提供了预配置的测试账户。您可以使用以下任
 4. 粘贴上面的私钥 (选择账户 #0 或 #1)
 5. 点击 **"导入"**
 
-## ✅ 步骤 3: 切换到本地网络
+## 步骤 3: 切换到本地网络
 
 1. 确保 MetaMask 切换到 **"Localhost 8545"** 网络
 2. 确认您看到账户余额为 10000 ETH
 
-## 🚀 步骤 4: 连接 dApp
+## 步骤 4: 连接 dApp
 
 1. 访问应用: http://localhost:5173
 2. 点击右上角的 **"Connect Wallet"** 按钮
 3. MetaMask 会弹出授权请求
 4. 点击 **"下一步"** → **"连接"**
 
-## 🎯 已部署的合约地址
+## 已部署的合约地址
 
 当前部署的合约地址 (来自 `public/deployed.json`):
 
@@ -66,7 +66,7 @@ Hardhat 本地节点提供了预配置的测试账户。您可以使用以下任
 
 ⚠️ **注意:** 每次重启 Hardhat 节点后，这些地址会改变。需要重新部署并复制 artifacts。
 
-## 🔧 常见问题
+## 常见问题
 
 ### Q1: MetaMask 显示 "错误的网络"
 **A:** 确保已切换到 "Localhost 8545" 网络
@@ -88,14 +88,14 @@ npm run chain
 bash setup-artifacts.sh
 ```
 
-## 🎉 测试功能
+## 测试功能
 
 连接成功后，您可以测试:
 
-1. ✅ **Manufacturer Portal** - 注册产品、转移给零售商
-2. ✅ **Retailer Portal** - 管理库存、销售给用户
-3. ✅ **User Dashboard** - 查看产品、申请保修
-4. ✅ **Service Center** - 审核保修申请
+1. **Manufacturer Portal** - 注册产品、转移给零售商
+2. **Retailer Portal** - 管理库存、销售给用户
+3. **User Dashboard** - 查看产品、申请保修
+4. **Service Center** - 审核保修申请
 
 每个写操作都会触发 MetaMask 签名请求！
 
