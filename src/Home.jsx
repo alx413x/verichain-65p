@@ -1,72 +1,67 @@
 import React, { useState } from 'react';
-import { Search, Wallet, AlertCircle } from 'lucide-react'; // 引入 AlertCircle 图标
+import { Search, Wallet, AlertCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-
-// --- 1. 模拟区块链数据库 ---
-const MOCK_DATABASE = [
-  {
-    sn: 'SN-111',
-    model: 'Apple Watch Series 9',
-    manufacturer: 'Apple Inc.',
-    owner: '0x123456789abcdef',
-    image: '⌚',
-    warrantyStatus: 'Active',
-    warrantyEnd: 'Dec 12, 2025',
-    claimsLeft: '2/3',
-    history: [
-      { date: 'Sep 5, 2025', desc: 'Manufactured by Apple Inc.' },
-      { date: 'Sep 15, 2025', desc: 'Transferred to authorized retailer' },
-      { date: 'Sep 25, 2025', desc: 'Sold to owner 0x1234...def (Warranted)' },
-      { date: 'Oct 5, 2025', desc: 'Served by Apple Authorized Service Center' },
-    ]
-  },
-  {
-    sn: 'SN-222',
-    model: 'iPhone 16 Pro',
-    manufacturer: 'Apple Inc.',
-    owner: '0x987654321fedcba',
-    image: '📱',
-    warrantyStatus: 'Active',
-    warrantyEnd: 'Nov 01, 2026',
-    claimsLeft: '1/1',
-    history: [
-      { date: 'Oct 1, 2025', desc: 'Manufactured by Apple Inc.' },
-      { date: 'Oct 10, 2025', desc: 'Sold to owner' },
-    ]
-  }
-];
+import { useContracts } from './contexts/ContractsContext';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { productRegistry } = useContracts();
   const [searchQuery, setSearchQuery] = useState('');
-  const [showError, setShowError] = useState(false); // 控制弹窗显示
+  const [showError, setShowError] = useState(false);
+  const [searching, setSearching] = useState(false);
 
-  // --- 2. 搜索处理函数 ---
-  const handleSearch = () => {
+  // --- Search handler with blockchain integration ---
+  const handleSearch = async () => {
     if (!searchQuery.trim()) return;
+    
+    if (!productRegistry) {
+      alert('Please connect your wallet first');
+      return;
+    }
 
-    // 在模拟数据库中查找
-    const foundProduct = MOCK_DATABASE.find(
-      item => item.sn.toLowerCase() === searchQuery.toLowerCase()
-    );
-
-    if (foundProduct) {
-      // 如果找到了，跳转到 Passport 页面，并把数据传过去
-      navigate('/passport', { state: { product: foundProduct } });
-    } else {
-      // 如果没找到，显示错误弹窗
-      setShowError(true);
+    try {
+      setSearching(true);
       
-      // 3秒后自动消失
-      setTimeout(() => {
-        setShowError(false);
-      }, 3000);
+      // Try to get product from blockchain
+      const productDetails = await productRegistry.getProductDetails(searchQuery.trim());
+      
+      // If product exists, navigate to passport page
+      if (productDetails && productDetails.model) {
+        navigate('/passport', { 
+          state: { 
+            product: {
+              sn: searchQuery.trim(),
+              serialNumber: searchQuery.trim(),
+              model: productDetails.model,
+              manufacturer: 'Manufacturer',
+              owner: productDetails.currentOwner,
+              warrantyStatus: productDetails.warranty.isActive ? 'Active' : 'Expired',
+              warrantyEnd: new Date(Number(productDetails.warranty.expiration) * 1000).toLocaleDateString(),
+              claimsLeft: `${productDetails.warranty.remainingCount}/${productDetails.warranty.totalAllowed}`,
+            }
+          } 
+        });
+      } else {
+        showNotFoundError();
+      }
+      setSearching(false);
+    } catch (err) {
+      console.error('Search error:', err);
+      showNotFoundError();
+      setSearching(false);
     }
   };
 
-  // 支持按回车键搜索
+  const showNotFoundError = () => {
+    setShowError(true);
+    setTimeout(() => {
+      setShowError(false);
+    }, 3000);
+  };
+
+  // Support Enter key for search
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !searching) {
       handleSearch();
     }
   };
@@ -74,7 +69,7 @@ const Home = () => {
   return (
     <div className="w-full min-h-screen bg-white font-sans text-black relative overflow-x-hidden">
       
-      {/* =================== 错误弹窗 (Popup) =================== */}
+      {/* =================== Error Popup =================== */}
       {showError && (
         <div className="fixed top-10 left-1/2 transform -translate-x-1/2 z-[100] animate-bounce-in">
           <div className="bg-red-500 text-white px-8 py-4 rounded-xl shadow-2xl flex items-center gap-4 text-[20px] font-bold">
@@ -103,23 +98,28 @@ const Home = () => {
         <div className="relative w-full max-w-[633px] h-[63px] mb-16 px-4">
           <div className="w-full h-full bg-white rounded-full shadow-sm flex items-center px-6 gap-4 border border-black/5 hover:shadow-md transition-shadow">
             
-            {/* 点击图标也可以搜索 */}
+            {/* Click icon to search */}
             <Search className="text-black w-6 h-6 cursor-pointer" onClick={handleSearch}/>
             
             <input 
               type="text" 
-              placeholder="Search Serial Number (Try: SN-111)" 
+              placeholder="Search Serial Number (e.g., PHONE-001)" 
               className="flex-1 h-full outline-none text-[18px] text-gray-600 placeholder-gray-400 bg-transparent"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleKeyDown} // 绑定回车键
+              onKeyDown={handleKeyDown}
+              disabled={searching}
             />
 
-            {/* 清空按钮 */}
+            {/* Clear button */}
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-black">
                 x
               </button>
+            )}
+            
+            {searching && (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
             )}
           </div>
         </div>

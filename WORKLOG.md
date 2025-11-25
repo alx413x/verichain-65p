@@ -295,12 +295,94 @@ All three portals (Retailer, User, Service Center) now have full blockchain inte
 - Loading states and empty states
 - Clean UI without text hints on disabled elements
 
-### Phase 4: 事件监听 (TODO)
+**Bug Fixes (Nov 25, 2025):**
+1. Fixed Service Center claims not displaying - removed `isServiceCenter` requirement for loading claims (claims are read-only for all roles, but only Service Center can approve/reject)
+2. Fixed claim approval/rejection - updated to use correct contract method `reviewClaim(serialNumber, claimIndex, approve, reviewReason)` instead of non-existent `approveClaim`/`rejectClaim`
+3. Fixed Home search - integrated with blockchain via `ProductRegistry.getProductDetails()` instead of mock data
+4. Fixed Manufacturer transfer button - now shows blue color when products are selected, gray when disabled
 
-- [ ] 监听 ProductRegistered 事件
-- [ ] 监听 OwnershipTransferred 事件
-- [ ] 监听 ClaimSubmitted 事件
-- [ ] 实时更新 UI
+### Phase 4: Event Listening (COMPLETED)
+
+Implemented real-time blockchain event listening for automatic UI updates.
+
+**Events Monitored:**
+
+1. **ProductRegistered** (from ProductRegistry)
+   - Emitted when: Manufacturer registers a new product
+   - Parameters: `serialNumber`, `model`, `manufacturer`, `timestamp`, `initialOwner`
+   - Triggers: Auto-refresh manufacturer product list
+
+2. **OwnershipTransferred** (from OwnershipManager)
+   - Emitted when: Product ownership changes (manufacturer to retailer, retailer to customer)
+   - Parameters: `serialNumber`, `from`, `to`, `date`
+   - Triggers: Auto-refresh relevant portal's inventory
+     - Manufacturer: When `from === account` (transfer out)
+     - Retailer: When `to === account` (receive) or `from === account` (sell)
+     - User: When `to === account` (purchase)
+
+3. **ClaimSubmitted** (from WarrantyManager)
+   - Emitted when: Customer submits warranty claim
+   - Parameters: `serialNumber`, `claimant`, `reason`
+   - Triggers: Auto-refresh Service Center claims list, User product list
+
+4. **ClaimReviewed** (from WarrantyManager)
+   - Emitted when: Service Center approves/rejects claim
+   - Parameters: `serialNumber`, `reviewer`, `status`, `reviewReason`
+   - Triggers: Auto-refresh Service Center claims list, User product list
+
+5. **WarrantyCreated** (from ProductRegistry)
+   - Emitted when: Warranty is created for a product
+   - Parameters: `serialNumber`, `startDate`, `expiration`
+   - Logged to console for tracking
+
+**Implementation Details:**
+
+1. **ContractsContext Enhancement**
+   - Added event listener setup in `useEffect` hook
+   - Stores event history in `eventListeners` state
+   - Provides `latestEvent` to all components via context
+   - Automatic cleanup on unmount using `removeAllListeners()`
+
+2. **Component Auto-Refresh**
+   - Each portal listens to `latestEvent` via `useEffect`
+   - Checks if event is relevant to current user/role
+   - Automatically calls load function to refresh data
+   - No manual refresh needed
+
+3. **Event Listener Pattern**
+   ```javascript
+   contract.on('EventName', (param1, param2, ...) => {
+     console.log('Event received:', param1, param2);
+     setEventListeners(prev => [...prev, { type, data, id }]);
+   });
+   ```
+
+4. **Console Logging**
+   - All events logged to console with formatted data
+   - Helps debugging and tracking blockchain activity
+   - Timestamps converted to readable format
+
+**Benefits:**
+
+- Real-time UI updates without manual page refresh
+- Multiple browser tabs stay synchronized
+- Immediate feedback when other users perform actions
+- Better UX with automatic data refresh
+- Complete audit trail in console logs
+
+**Usage Example:**
+
+1. Open Manufacturer portal in one browser tab
+2. Open Retailer portal in another tab (different MetaMask account)
+3. Manufacturer transfers product to retailer
+4. Retailer tab automatically refreshes and shows new product
+5. No page reload needed
+
+**Phase 4 Implementation Complete:**
+- All required events monitored
+- Auto-refresh implemented in all portals
+- Event cleanup on component unmount
+- Console logging for debugging
 
 ### Phase 5: 优化和完善 (TODO)
 

@@ -9,7 +9,8 @@ const Manufacturer = () => {
     isManufacturer, 
     productRegistry, 
     ownershipManager,
-    isConnected 
+    isConnected,
+    latestEvent
   } = useContracts();
 
   // --- 1. 状态管理 ---
@@ -40,6 +41,22 @@ const Manufacturer = () => {
       loadProducts();
     }
   }, [productRegistry, ownershipManager, account, isManufacturer]);
+
+  // --- Auto-refresh when relevant events occur ---
+  useEffect(() => {
+    if (!latestEvent || !isManufacturer) return;
+    
+    const { type, data } = latestEvent;
+    
+    // Refresh product list when relevant events occur
+    if (type === 'ProductRegistered' && data.manufacturer === account) {
+      console.log('Manufacturer: Auto-refreshing due to ProductRegistered event');
+      loadProducts();
+    } else if (type === 'OwnershipTransferred' && data.from === account) {
+      console.log('Manufacturer: Auto-refreshing due to OwnershipTransferred event (transfer out)');
+      loadProducts();
+    }
+  }, [latestEvent, isManufacturer, account]);
 
   const loadProducts = async () => {
     try {
@@ -368,8 +385,11 @@ const Manufacturer = () => {
               <button 
                 onClick={handleTransfer}
                 disabled={loading || selectedProductIds.length === 0}
-                className="flex-1 h-[55px] bg-[#8EA5FF] text-white text-[18px] font-medium rounded-lg hover:bg-[#7a92f0] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: selectedProductIds.length > 0 ? '#8EA5FF' : undefined }}
+                className={`flex-1 h-[55px] text-white text-[18px] font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                  selectedProductIds.length > 0 && !loading
+                    ? 'bg-[#0C86DE] hover:bg-blue-700'
+                    : 'bg-gray-300 opacity-50'
+                }`}
               >
                 <ArrowRightLeft size={20} /> 
                 {loading ? 'Transferring...' : `转移 ${selectedProductIds.length} 个产品`}

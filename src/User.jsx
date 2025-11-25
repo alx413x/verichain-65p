@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useContracts } from './contexts/ContractsContext';
 
 const User = () => {
-  const { isConnected, isCustomer, productRegistry, ownershipManager, warrantyManager, account } = useContracts();
+  const { isConnected, isCustomer, productRegistry, ownershipManager, warrantyManager, account, latestEvent } = useContracts();
 
   // --- 1. State management ---
   const [myProducts, setMyProducts] = useState([]);
@@ -24,6 +24,25 @@ const User = () => {
       loadProducts();
     }
   }, [productRegistry, ownershipManager, warrantyManager, account, isCustomer]);
+
+  // --- Auto-refresh when relevant events occur ---
+  useEffect(() => {
+    if (!latestEvent || !isCustomer) return;
+    
+    const { type, data } = latestEvent;
+    
+    // Refresh products when customer receives products or submits claims
+    if (type === 'OwnershipTransferred' && data.to === account) {
+      console.log('User: Auto-refreshing due to OwnershipTransferred event (product received)');
+      loadProducts();
+    } else if (type === 'ClaimSubmitted' && data.claimant === account) {
+      console.log('User: Auto-refreshing due to ClaimSubmitted event');
+      loadProducts();
+    } else if (type === 'ClaimReviewed') {
+      console.log('User: Auto-refreshing due to ClaimReviewed event');
+      loadProducts();
+    }
+  }, [latestEvent, isCustomer, account]);
 
   const loadProducts = async () => {
     try {

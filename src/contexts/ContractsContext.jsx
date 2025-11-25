@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import useEthers from '../hooks/useEthers';
 import useContract from '../hooks/useContract';
 import { loadArtifacts } from '../hooks/loadArtifacts';
@@ -20,6 +20,8 @@ export const ContractsProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
+  const [eventListeners, setEventListeners] = useState([]);
+  const listenersSetup = useRef(false);
 
   // Load contract artifacts on mount
   useEffect(() => {
@@ -135,6 +137,113 @@ export const ContractsProvider = ({ children }) => {
     loadRoles();
   }, [accessControl, account, provider]);
 
+  // Setup event listeners for real-time updates
+  useEffect(() => {
+    if (!productRegistry || !ownershipManager || !warrantyManager || listenersSetup.current) {
+      return;
+    }
+
+    console.log('Setting up blockchain event listeners...');
+    listenersSetup.current = true;
+
+    // Listen for ProductRegistered events
+    productRegistry.on('ProductRegistered', (serialNumber, model, manufacturer, timestamp, initialOwner) => {
+      console.log('Event: ProductRegistered', {
+        serialNumber,
+        model,
+        manufacturer,
+        timestamp: new Date(Number(timestamp) * 1000).toLocaleString(),
+        initialOwner
+      });
+      
+      // Trigger UI refresh callback if registered
+      setEventListeners(prev => [...prev, {
+        type: 'ProductRegistered',
+        data: { serialNumber, model, manufacturer, timestamp, initialOwner },
+        id: Date.now()
+      }]);
+    });
+
+    // Listen for OwnershipTransferred events
+    ownershipManager.on('OwnershipTransferred', (serialNumber, from, to, date) => {
+      console.log('Event: OwnershipTransferred', {
+        serialNumber,
+        from,
+        to,
+        date: new Date(Number(date) * 1000).toLocaleString()
+      });
+      
+      setEventListeners(prev => [...prev, {
+        type: 'OwnershipTransferred',
+        data: { serialNumber, from, to, date },
+        id: Date.now()
+      }]);
+    });
+
+    // Listen for ClaimSubmitted events
+    warrantyManager.on('ClaimSubmitted', (serialNumber, claimant, reason) => {
+      console.log('Event: ClaimSubmitted', {
+        serialNumber,
+        claimant,
+        reason
+      });
+      
+      setEventListeners(prev => [...prev, {
+        type: 'ClaimSubmitted',
+        data: { serialNumber, claimant, reason },
+        id: Date.now()
+      }]);
+    });
+
+    // Listen for ClaimReviewed events
+    warrantyManager.on('ClaimReviewed', (serialNumber, reviewer, status, reviewReason) => {
+      console.log('Event: ClaimReviewed', {
+        serialNumber,
+        reviewer,
+        status: status === 1n ? 'Approved' : 'Rejected',
+        reviewReason
+      });
+      
+      setEventListeners(prev => [...prev, {
+        type: 'ClaimReviewed',
+        data: { serialNumber, reviewer, status, reviewReason },
+        id: Date.now()
+      }]);
+    });
+
+    // Listen for WarrantyCreated events
+    productRegistry.on('WarrantyCreated', (serialNumber, startDate, expiration) => {
+      console.log('Event: WarrantyCreated', {
+        serialNumber,
+        startDate: new Date(Number(startDate) * 1000).toLocaleString(),
+        expiration: new Date(Number(expiration) * 1000).toLocaleString()
+      });
+      
+      setEventListeners(prev => [...prev, {
+        type: 'WarrantyCreated',
+        data: { serialNumber, startDate, expiration },
+        id: Date.now()
+      }]);
+    });
+
+    console.log('Event listeners active');
+
+    // Cleanup on unmount
+    return () => {
+      console.log('Cleaning up event listeners...');
+      if (productRegistry) {
+        productRegistry.removeAllListeners();
+      }
+      if (ownershipManager) {
+        ownershipManager.removeAllListeners();
+      }
+      if (warrantyManager) {
+        warrantyManager.removeAllListeners();
+      }
+      listenersSetup.current = false;
+    };
+  }, [productRegistry, ownershipManager, warrantyManager]);
+
   const value = {
     // Wallet connection
     provider,
@@ -163,7 +272,11 @@ export const ContractsProvider = ({ children }) => {
     // Metadata
     artifacts,
     loading,
-    error
+    error,
+    
+    // Event system
+    eventListeners,
+    latestEvent: eventListeners[eventListeners.length - 1] || null
   };
 
   return (

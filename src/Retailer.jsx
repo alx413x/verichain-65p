@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useContracts } from './contexts/ContractsContext';
 
 const Retailer = () => {
-  const { isConnected, isRetailer, productRegistry, ownershipManager, account } = useContracts();
+  const { isConnected, isRetailer, productRegistry, ownershipManager, account, latestEvent } = useContracts();
 
   // --- 辅助函数：获取今天的日期 (YYYY-MM-DD) ---
   const getTodayString = () => {
@@ -45,6 +45,19 @@ const Retailer = () => {
       loadInventory();
     }
   }, [productRegistry, ownershipManager, account, isRetailer]);
+
+  // --- Auto-refresh when relevant events occur ---
+  useEffect(() => {
+    if (!latestEvent || !isRetailer) return;
+    
+    const { type, data } = latestEvent;
+    
+    // Refresh inventory when products are transferred to or from retailer
+    if (type === 'OwnershipTransferred' && (data.to === account || data.from === account)) {
+      console.log('Retailer: Auto-refreshing due to OwnershipTransferred event');
+      loadInventory();
+    }
+  }, [latestEvent, isRetailer, account]);
 
   const loadInventory = async () => {
     try {

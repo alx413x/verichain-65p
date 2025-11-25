@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useContracts } from './contexts/ContractsContext';
 
 const ServiceCenter = () => {
-  const { isConnected, isServiceCenter, warrantyManager, productRegistry, account } = useContracts();
+  const { isConnected, isServiceCenter, warrantyManager, productRegistry, account, latestEvent } = useContracts();
 
   // --- 1. State management ---
   const [claims, setClaims] = useState([]);
@@ -14,10 +14,26 @@ const ServiceCenter = () => {
 
   // --- 2. Load claims from blockchain ---
   useEffect(() => {
-    if (warrantyManager && productRegistry && account && isServiceCenter) {
+    if (warrantyManager && productRegistry && account) {
       loadClaims();
     }
-  }, [warrantyManager, productRegistry, account, isServiceCenter]);
+  }, [warrantyManager, productRegistry, account]);
+
+  // --- Auto-refresh when relevant events occur ---
+  useEffect(() => {
+    if (!latestEvent) return;
+    
+    const { type } = latestEvent;
+    
+    // Refresh claims list when new claims submitted or reviewed
+    if (type === 'ClaimSubmitted') {
+      console.log('ServiceCenter: Auto-refreshing due to ClaimSubmitted event');
+      loadClaims();
+    } else if (type === 'ClaimReviewed') {
+      console.log('ServiceCenter: Auto-refreshing due to ClaimReviewed event');
+      loadClaims();
+    }
+  }, [latestEvent]);
 
   const loadClaims = async () => {
     try {
@@ -25,9 +41,10 @@ const ServiceCenter = () => {
       
       // Get all warranty claims
       const allClaims = await warrantyManager.listAllWarrantyClaims();
+      console.log('Raw claims from contract:', allClaims);
       
       const claimsData = await Promise.all(
-        allClaims.map(async (claim) => {
+        allClaims.map(async (claim, index) => {
           try {
             // Get product details
             const productDetails = await productRegistry.getProductDetails(claim.serialNumber);
@@ -38,18 +55,18 @@ const ServiceCenter = () => {
             else if (claim.status === 2n) status = 'Rejected';
             
             return {
-              id: Number(claim.claimId),
-              claimId: Number(claim.claimId),
+              id: index,
+              claimId: index,
               serialNumber: claim.serialNumber,
-              customer: claim.customer,
-              address: `${claim.customer.slice(0, 6)}...${claim.customer.slice(-4)}`,
+              customer: claim.claimant,
+              address: `${claim.claimant.slice(0, 6)}...${claim.claimant.slice(-4)}`,
               reason: claim.reason || 'No reason provided',
               status: status,
-              date: new Date(Number(claim.timestamp) * 1000).toLocaleDateString(),
+              date: new Date(Number(claim.submitDate) * 1000).toLocaleDateString(),
               model: productDetails.model
             };
           } catch (err) {
-            console.error(`Error loading claim ${claim.claimId}:`, err);
+            console.error(`Error loading claim ${index}:`, err);
             return null;
           }
         })
@@ -57,6 +74,7 @@ const ServiceCenter = () => {
       
       // Filter out null entries
       const validClaims = claimsData.filter(claim => claim !== null);
+      console.log('Processed claims:', validClaims);
       setClaims(validClaims);
       setLoading(false);
     } catch (err) {
@@ -67,10 +85,11 @@ const ServiceCenter = () => {
   };
 
   // --- 3. Handle claim actions ---
-  const handleApprove = async (claimId) => {
+  const handleApprove = async (claimId, serialNumber) => {
     try {
       setProcessing(true);
-      const tx = await warrantyManager.approveClaim(claimId);
+      // reviewClaim(serialNumber, claimIndex, approve, reviewReason)
+      const tx = await warrantyManager.reviewClaim(serialNumber, claimId, true, 'Approved by service center');
       await tx.wait();
       
       // Reload claims
@@ -83,10 +102,11 @@ const ServiceCenter = () => {
     }
   };
 
-  const handleReject = async (claimId) => {
+  const handleReject = async (claimId, serialNumber) => {
     try {
       setProcessing(true);
-      const tx = await warrantyManager.rejectClaim(claimId);
+      // reviewClaim(serialNumber, claimIndex, approve, reviewReason)
+      const tx = await warrantyManager.reviewClaim(serialNumber, claimId, false, 'Rejected by service center');
       await tx.wait();
       
       // Reload claims
@@ -168,14 +188,14 @@ const ServiceCenter = () => {
                       isServiceCenter ? (
                         <>
                           <button 
-                            onClick={() => handleReject(item.claimId)}
+                            onClick={() => handleReject(item.claimId, item.serialNumber)}
                             disabled={processing}
                             className="w-[50px] h-[50px] rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <X size={30} />
                           </button>
                           <button 
-                            onClick={() => handleApprove(item.claimId)}
+                            onClick={() => handleApprove(item.claimId, item.serialNumber)}
                             disabled={processing}
                             className="w-[50px] h-[50px] rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                           >
