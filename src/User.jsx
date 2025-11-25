@@ -1,54 +1,105 @@
-// src/User.jsx (修改后)
-import React, { useState } from 'react';
+// src/User.jsx
+import React, { useState, useEffect } from 'react';
 import { Wallet, Shield, FileText, AlertCircle, X, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useContracts } from './contexts/ContractsContext';
 
 const User = () => {
-  // --- 1. 模拟用户拥有的产品数据 ---
-  const [myProducts, setMyProducts] = useState([
-    {
-      id: 1,
-      serialNumber: 'SN-111',
-      model: 'Apple Watch Series 9',
-      image: '⌚', // 这里的 emoji 模拟产品图片
-      purchaseDate: '2024-01-15',
-      warrantyExp: '2026-01-15',
-      status: 'Active', // Active, Claiming, Expired
-      description: 'Space Gray Aluminum Case with Midnight Sport Band'
-    },
-    {
-      id: 2,
-      serialNumber: 'SN-222',
-      model: 'iPhone 16 Pro',
-      image: '📱',
-      purchaseDate: '2024-10-01',
-      warrantyExp: '2025-10-01',
-      status: 'Active',
-      description: 'Titanium Black, 256GB'
-    }
-  ]);
+  const { isConnected, isCustomer, productRegistry, ownershipManager, warrantyManager, account } = useContracts();
 
-  // --- 2. 弹窗状态 ---
+  // --- 1. State management ---
+  const [myProducts, setMyProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // --- 2. Modal state ---
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [claimReason, setClaimReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  // --- 3. 处理保修申请 ---
+  // --- 3. Load products from blockchain ---
+  useEffect(() => {
+    if (productRegistry && ownershipManager && warrantyManager && account && isCustomer) {
+      loadProducts();
+    }
+  }, [productRegistry, ownershipManager, warrantyManager, account, isCustomer]);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const ownedProducts = await ownershipManager.getProductsByOwner(account);
+      
+      const productsData = await Promise.all(
+        ownedProducts.map(async (serialNumber) => {
+          const details = await productRegistry.getProductDetails(serialNumber);
+          
+          // Calculate warranty status
+          const now = Math.floor(Date.now() / 1000);
+          const warrantyExpiration = Number(details.warranty.expiration);
+          const isExpired = warrantyExpiration > 0 && now > warrantyExpiration;
+          const warrantyStartDate = Number(details.warranty.startDate);
+          
+          return {
+            id: serialNumber,
+            serialNumber: serialNumber,
+            model: details.model,
+            image: '📦',
+            purchaseDate: warrantyStartDate > 0 ? new Date(warrantyStartDate * 1000).toLocaleDateString() : 'N/A',
+            warrantyExp: warrantyExpiration > 0 ? new Date(warrantyExpiration * 1000).toLocaleDateString() : 'No Warranty',
+            status: isExpired ? 'Expired' : 'Active',
+            description: `Serial: ${serialNumber}`,
+            warrantyDays: warrantyExpiration > 0 ? Math.floor((warrantyExpiration - warrantyStartDate) / 86400) : 0,
+            claimsRemaining: Number(details.warranty.remainingCount)
+          };
+        })
+      );
+      
+      setMyProducts(productsData);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading products:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // --- 4. Handle warranty claim ---
   const openClaimModal = (product) => {
     setSelectedProduct(product);
     setIsClaimModalOpen(true);
   };
 
-  const handleSubmitClaim = (e) => {
+  const handleSubmitClaim = async (e) => {
     e.preventDefault();
-    // 更新产品状态为 "Claiming"
-    const updatedProducts = myProducts.map(p => 
-      p.id === selectedProduct.id ? { ...p, status: 'Claiming' } : p
-    );
-    setMyProducts(updatedProducts);
-    setIsClaimModalOpen(false);
-    setClaimReason('');
-    alert(`Warranty claim submitted for ${selectedProduct.model}. Please check Service Center status.`);
+    
+    if (!claimReason.trim()) {
+      alert('Please provide a reason for the claim');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      // Submit warranty claim
+      const tx = await warrantyManager.submitClaim(
+        selectedProduct.serialNumber,
+        claimReason
+      );
+      await tx.wait();
+
+      // Reload products
+      await loadProducts();
+      
+      setIsClaimModalOpen(false);
+      setClaimReason('');
+      alert(`Warranty claim submitted for ${selectedProduct.model}. Please check Service Center for status.`);
+      setSubmitting(false);
+    } catch (err) {
+      console.error('Claim submission failed:', err);
+      alert(`Claim submission failed: ${err.message}`);
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -58,23 +109,32 @@ const User = () => {
       {/* ================= Main Content ================= */}
       <main className="max-w-[1512px] mx-auto px-[123px] pt-12 pb-20">
         
-        {/* Header (根据设计稿修改文本和样式) */}
+        {/* Header */}
         <div className="mb-12">
-          {/* 对应设计稿的 "My Digital Passports" */}
           <h1 className="text-[40px] font-bold mb-2">My Digital Passports</h1>
-          {/* 对应设计稿的 "Manage your product ownership and warranties" */}
           <p className="text-[25px] font-medium text-black/70">Manage your product ownership and warranties</p>
         </div>
 
-        {/* Product List (Card Style) */}
-        {/* 为了匹配设计稿中 image 4 和 image 10 的并排结构，将 flex-col 改为 grid */}
+        {/* Product List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {myProducts.map((product) => (
+          {loading ? (
+            <div className="col-span-2 w-full h-[400px] bg-white rounded-lg flex items-center justify-center shadow-sm">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading your products...</p>
+              </div>
+            </div>
+          ) : myProducts.length === 0 ? (
+            <div className="col-span-2 w-full h-[400px] bg-white rounded-lg flex flex-col items-center justify-center text-gray-400 text-xl shadow-sm">
+              <p>No products found</p>
+              <p className="text-sm mt-2">Products you own will appear here</p>
+            </div>
+          ) : (
+            myProducts.map((product) => (
             // 调整卡片宽度和样式以匹配设计稿尺寸（如 472px 宽）
             <div key={product.id} className="bg-white w-full rounded-[20px] shadow-md p-8 flex flex-col items-start gap-6 hover:shadow-lg transition-all animate-fade-in">
               
-              {/* Product Image Placeholder (200x200 保持不变) */}
+              {/* Product Image Placeholder */}
               <div className="w-[200px] h-[200px] bg-gray-100 rounded-xl flex items-center justify-center text-[80px]">
                 {product.image}
               </div>
@@ -96,8 +156,8 @@ const User = () => {
                     product.status === 'Claiming' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
                     'bg-red-100 text-red-700 border-red-200'
                   }`}>
-                    {product.status === 'Active' ? '✅ Protected' : 
-                     product.status === 'Claiming' ? '⚠️ In Review' : 'Expired'}
+                    {product.status === 'Active' ? 'Protected' : 
+                     product.status === 'Claiming' ? 'In Review' : 'Expired'}
                   </span>
                 </div>
 
@@ -121,8 +181,13 @@ const User = () => {
                   
                   {product.status === 'Active' && (
                     <button 
-                      onClick={() => openClaimModal(product)}
-                      className="flex-1 h-[60px] bg-[#0C86DE] text-white rounded-xl text-[22px] font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-md"
+                      onClick={() => isCustomer && openClaimModal(product)}
+                      disabled={!isCustomer}
+                      className={`flex-1 h-[60px] rounded-xl text-[22px] font-bold transition-colors flex items-center justify-center gap-2 ${
+                        isCustomer 
+                          ? 'bg-[#0C86DE] text-white hover:bg-blue-700 shadow-md cursor-pointer' 
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      }`}
                     >
                       <Shield size={24} /> Claim Warranty
                     </button>
@@ -137,7 +202,8 @@ const User = () => {
 
               </div>
             </div>
-          ))}
+          ))
+          )}
         </div>
 
         {/* ← Back to Home 链接 (根据设计稿添加) */}
@@ -183,9 +249,10 @@ const User = () => {
 
               <button 
                 type="submit"
-                className="w-full h-[70px] bg-[#0C86DE] text-white text-[25px] font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg"
+                disabled={submitting}
+                className="w-full h-[70px] bg-[#0C86DE] text-white text-[25px] font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit Claim Request
+                {submitting ? 'Submitting...' : 'Submit Claim Request'}
               </button>
             </form>
           </div>

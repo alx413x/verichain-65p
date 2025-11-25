@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "chain": "npx hardhat node",
     "deploy:local": "npx hardhat run contractsLogic/scripts/deploy.cjs --network localhost",
-    "compile": "npx hardhat compile"
+    "compile": "npx hardhat compile",
+    "grant-roles": "npx hardhat run contractsLogic/scripts/grantRoles.cjs --network localhost"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",

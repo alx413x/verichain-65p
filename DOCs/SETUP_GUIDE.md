@@ -37,12 +37,14 @@ npm run chain
 ```bash
 npm run compile
 npm run deploy:local
+npm run grant-roles
 ```
 
 这将:
 - 编译智能合约
 - 部署到本地节点
-- 生成 ABIs 和部署地址到 `contractsLogic/doc/`
+- 授予角色
+- 生成 ABIs 和部署地址到 `contractsLogic/doc/` (下一步中)
 
 #### 4. 复制合约文件到前端
 
@@ -69,21 +71,16 @@ cp contractsLogic/doc/abis/*.json public/abis/
    - **网络名称:** Localhost 8545
    - **RPC URL:** http://127.0.0.1:8545
    - **链 ID:** 31337
-   - **货币符号:** ETH
+   - **货币符号:** ETH (可以随便)
 
 ##### 导入测试账户:
 
-Hardhat 本地节点会生成测试账户。在启动节点的终端中可以看到私钥列表。
+Hardhat 本地节点会生成测试账户。在**启动节点的终端中**可以看到私钥列表。
 
 复制第一个账户的私钥，在 MetaMask 中:
 1. 点击账户图标
 2. 选择 "导入账户"
 3. 粘贴私钥
-
-**示例私钥 (仅用于本地测试):**
-```
-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-```
 
 #### 6. 启动前端
 
@@ -110,9 +107,9 @@ npm run dev
 
 ### 功能说明:
 
-- ✅ **读取合约数据** - 无需连接钱包
-- ✅ **写入交易** - 需要 MetaMask 签名
-- ✅ **角色管理** - 需要账户授权
+- **读取合约数据** - 无需连接钱包
+- **写入交易** - 需要 MetaMask 签名
+- **角色管理** - 需要账户授权
 
 ---
 
@@ -201,7 +198,7 @@ bash setup-artifacts.sh  # 复制合约文件到 public/
 每次开发时:
 
 1. 启动本地节点: `npm run chain`
-2. 部署合约: `npm run deploy:local`
+2. 部署合约: `npm run deploy:local` (在新的终端中)
 3. 复制 artifacts: `bash setup-artifacts.sh`
 4. 启动前端: `npm run dev`
 5. 连接 MetaMask (确保使用 Localhost 8545 网络)

@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
-import { Wallet, Plus, ArrowRightLeft, X, CheckCircle, Box, CheckSquare, Square } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Wallet, Plus, ArrowRightLeft, X, CheckCircle, Box, CheckSquare, Square, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useContracts } from './contexts/ContractsContext';
 
 const Manufacturer = () => {
+  const { 
+    account, 
+    isManufacturer, 
+    productRegistry, 
+    ownershipManager,
+    isConnected 
+  } = useContracts();
+
   // --- 1. 状态管理 ---
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [isTransferOpen, setIsTransferOpen] = useState(false); // Transfer modal state
-  
-  // Success Popup State
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Data State
-  const [products, setProducts] = useState([
-    // Initial mock data so transfer modal isn't empty
-    { id: 101, serialNumber: 'SN001', model: 'Apple Watch Series 9', date: '2025-10-10', status: 'In Stock', warranty: '365', claims: '2' },
-    { id: 102, serialNumber: 'SN002', model: 'Apple Watch Series 9', date: '2025-10-11', status: 'In Stock', warranty: '365', claims: '2' },
-    { id: 103, serialNumber: 'SN003', model: 'Samsung Galaxy Watch 6', date: '2025-10-12', status: 'In Stock', warranty: '365', claims: '2' },
-  ]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Register Form
   const [registerForm, setRegisterForm] = useState({
@@ -32,7 +34,44 @@ const Manufacturer = () => {
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [addressError, setAddressError] = useState('');
 
-  // --- 2. 逻辑处理 ---
+  // --- 2. Load products from blockchain ---
+  useEffect(() => {
+    if (productRegistry && ownershipManager && account && isManufacturer) {
+      loadProducts();
+    }
+  }, [productRegistry, ownershipManager, account, isManufacturer]);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const ownedProducts = await ownershipManager.getProductsByOwner(account);
+      
+      const productsData = await Promise.all(
+        ownedProducts.map(async (serialNumber) => {
+          const details = await productRegistry.getProductDetails(serialNumber);
+          return {
+            id: serialNumber,
+            serialNumber: serialNumber,
+            model: details.model,
+            date: new Date(Number(details.timestamp) * 1000).toLocaleDateString(),
+            status: 'In Stock',
+            warranty: details.warranty.expiration > 0 ? 
+              Math.floor((Number(details.warranty.expiration) - Number(details.warranty.startDate)) / 86400) : '0',
+            claims: details.warranty.maxCount.toString()
+          };
+        })
+      );
+      
+      setProducts(productsData);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading products:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // --- 3. 逻辑处理 ---
 
   // Helper: Success Popup
   const triggerSuccessPopup = (msg) => {
@@ -47,24 +86,46 @@ const Manufacturer = () => {
     setRegisterForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (!registerForm.serialNumber || !registerForm.model) return;
 
-    const newProduct = {
-      id: Date.now(),
-      serialNumber: registerForm.serialNumber,
-      model: registerForm.model,
-      date: new Date().toLocaleDateString(),
-      status: 'In Stock',
-      warranty: registerForm.warranty,
-      claims: registerForm.allowedClaims
-    };
+    try {
+      setLoading(true);
+      
+      // 1. Register product
+      const tx1 = await productRegistry.registerProduct(
+        registerForm.serialNumber,
+        registerForm.model
+      );
+      await tx1.wait();
 
-    setProducts([...products, newProduct]);
-    setIsRegisterOpen(false);
-    setRegisterForm({ serialNumber: '', model: '', warranty: '', allowedClaims: '' });
-    triggerSuccessPopup('Product Registered Successfully!');
+      // 2. Create warranty if specified
+      if (registerForm.warranty && registerForm.allowedClaims) {
+        const tx2 = await productRegistry.createWarranty(
+          registerForm.serialNumber,
+          registerForm.warranty,
+          registerForm.allowedClaims
+        );
+        await tx2.wait();
+      }
+
+      // 3. Sync ownership
+      const tx3 = await ownershipManager.syncOwnership(registerForm.serialNumber);
+      await tx3.wait();
+
+      setIsRegisterOpen(false);
+      setRegisterForm({ serialNumber: '', model: '', warranty: '', allowedClaims: '' });
+      triggerSuccessPopup('Product Registered Successfully!');
+      
+      // Reload products
+      await loadProducts();
+      setLoading(false);
+    } catch (err) {
+      console.error('Registration failed:', err);
+      alert(`Registration failed: ${err.message}`);
+      setLoading(false);
+    }
   };
 
   // Transfer Logic
@@ -76,10 +137,10 @@ const Manufacturer = () => {
     }
   };
 
-  const handleTransfer = () => {
+  const handleTransfer = async () => {
     // Validation
-    if (!transferAddress.startsWith('0x') || transferAddress.length < 5) {
-      setAddressError('请输入有效的以太坊地址'); // "Please enter valid ETH address"
+    if (!transferAddress.startsWith('0x') || transferAddress.length !== 42) {
+      setAddressError('Please enter a valid Ethereum address');
       return;
     }
     if (selectedProductIds.length === 0) {
@@ -87,21 +148,32 @@ const Manufacturer = () => {
       return;
     }
 
-    // Reset Error
-    setAddressError('');
+    try {
+      setLoading(true);
+      setAddressError('');
 
-    // Update status (Mock logic)
-    const updatedProducts = products.map(p => 
-      selectedProductIds.includes(p.id) ? { ...p, status: 'Transferred' } : p
-    );
-    setProducts(updatedProducts);
+      // Transfer each selected product
+      for (const serialNumber of selectedProductIds) {
+        const tx = await ownershipManager.transferOwnership(serialNumber, transferAddress);
+        await tx.wait();
+      }
 
-    // Close & Success
-    setIsTransferOpen(false);
-    setTransferAddress('');
-    setSelectedProductIds([]);
-    triggerSuccessPopup('Transfer Success!!');
+      setIsTransferOpen(false);
+      setTransferAddress('');
+      setSelectedProductIds([]);
+      triggerSuccessPopup(`Transferred ${selectedProductIds.length} product(s) successfully!`);
+      
+      // Reload products
+      await loadProducts();
+      setLoading(false);
+    } catch (err) {
+      console.error('Transfer failed:', err);
+      alert(`Transfer failed: ${err.message}`);
+      setLoading(false);
+    }
   };
+
+
 
   return (
     <div className="w-full min-h-screen bg-[#F9FAFB] font-sans text-black relative overflow-x-hidden">
@@ -126,16 +198,18 @@ const Manufacturer = () => {
 
         <div className="flex flex-wrap gap-8 mb-12">
           <button 
-            onClick={() => setIsRegisterOpen(true)}
-            className="flex items-center justify-center gap-3 px-[52px] py-[24px] bg-[#0C86DE] rounded-[20px] text-[#F9FAFB] text-[25px] font-medium hover:bg-blue-600 transition-shadow shadow-md min-w-[387px]"
+            onClick={() => isManufacturer && setIsRegisterOpen(true)}
+            disabled={loading || !isManufacturer}
+            className="flex items-center justify-center gap-3 px-[52px] py-[24px] bg-[#0C86DE] rounded-[20px] text-[#F9FAFB] text-[25px] font-medium hover:bg-blue-600 transition-shadow shadow-md min-w-[387px] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={30} />
             Register New Product
           </button>
 
           <button 
-            onClick={() => setIsTransferOpen(true)}
-            className="flex items-center justify-center gap-3 px-[52px] py-[24px] bg-[#089E23] rounded-[20px] text-[#F9FAFB] text-[25px] font-medium hover:bg-green-700 transition-shadow shadow-md min-w-[387px]"
+            onClick={() => isManufacturer && setIsTransferOpen(true)}
+            disabled={loading || products.length === 0 || !isManufacturer}
+            className="flex items-center justify-center gap-3 px-[52px] py-[24px] bg-[#089E23] rounded-[20px] text-[#F9FAFB] text-[25px] font-medium hover:bg-green-700 transition-shadow shadow-md min-w-[387px] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowRightLeft size={30} />
             Transfer to retailer
@@ -152,9 +226,17 @@ const Manufacturer = () => {
           </div>
 
           <div className="flex flex-col gap-4">
-            {products.length === 0 ? (
+            {loading ? (
+              <div className="w-full h-[200px] bg-white rounded-lg flex items-center justify-center shadow-sm">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading products...</p>
+                </div>
+              </div>
+            ) : products.length === 0 ? (
               <div className="w-full h-[200px] bg-white rounded-lg flex flex-col items-center justify-center text-gray-400 text-xl shadow-sm">
                 <p>No products registered yet.</p>
+                <p className="text-sm mt-2">Click "Register New Product" to get started</p>
               </div>
             ) : (
               products.map((item) => (
@@ -197,8 +279,10 @@ const Manufacturer = () => {
                 <input type="number" name="allowedClaims" value={registerForm.allowedClaims} onChange={handleInputChange} className="w-full h-[40px] px-3 text-[15px] bg-white border border-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-200 text-gray-800" />
               </div>
               <div className="mt-6 flex gap-3">
-                <button type="button" onClick={() => setIsRegisterOpen(false)} className="flex-1 h-[50px] bg-[#F3F4F6] text-gray-600 text-[15px] font-medium rounded-md hover:bg-gray-200 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 h-[50px] bg-[#2563EB] text-white text-[14px] font-medium rounded-md hover:bg-blue-700 transition-colors leading-tight px-2">Mint Product Passport</button>
+                <button type="button" onClick={() => setIsRegisterOpen(false)} className="flex-1 h-[50px] bg-[#F3F4F6] text-gray-600 text-[15px] font-medium rounded-md hover:bg-gray-200 transition-colors" disabled={loading}>Cancel</button>
+                <button type="submit" className="flex-1 h-[50px] bg-[#2563EB] text-white text-[14px] font-medium rounded-md hover:bg-blue-700 transition-colors leading-tight px-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
+                  {loading ? 'Processing...' : 'Mint Product Passport'}
+                </button>
               </div>
             </form>
           </div>
@@ -276,17 +360,19 @@ const Manufacturer = () => {
             <div className="flex gap-4">
               <button 
                 onClick={() => setIsTransferOpen(false)}
-                className="flex-1 h-[55px] bg-gray-100 text-gray-700 text-[18px] font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={loading}
+                className="flex-1 h-[55px] bg-gray-100 text-gray-700 text-[18px] font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
                 取消
               </button>
               <button 
                 onClick={handleTransfer}
-                className="flex-1 h-[55px] bg-[#8EA5FF] text-white text-[18px] font-medium rounded-lg hover:bg-[#7a92f0] transition-colors flex items-center justify-center gap-2"
-                style={{ backgroundColor: '#8EA5FF' }} // Matches the light blue in screenshot
+                disabled={loading || selectedProductIds.length === 0}
+                className="flex-1 h-[55px] bg-[#8EA5FF] text-white text-[18px] font-medium rounded-lg hover:bg-[#7a92f0] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: selectedProductIds.length > 0 ? '#8EA5FF' : undefined }}
               >
                 <ArrowRightLeft size={20} /> 
-                转移 {selectedProductIds.length} 个产品
+                {loading ? 'Transferring...' : `转移 ${selectedProductIds.length} 个产品`}
               </button>
             </div>
 

@@ -12,10 +12,20 @@ import { ethers } from 'ethers';
 */
 export default function useContract({ address, abi, provider, signer, asSigner = true }) {
   const contract = useMemo(() => {
-    if (!address || !abi || !provider) return null;
+    if (!address || !abi || !provider) {
+      console.log('useContract: Missing required parameters:', { 
+        hasAddress: !!address, 
+        hasAbi: !!abi, 
+        hasProvider: !!provider,
+        address 
+      });
+      return null;
+    }
     const conn = asSigner && signer ? signer : provider;
     try {
-      return new ethers.Contract(address, abi, conn);
+      const contractInstance = new ethers.Contract(address, abi, conn);
+      console.log('Contract created successfully:', address);
+      return contractInstance;
     } catch (e) {
       console.error('useContract error', e);
       return null;

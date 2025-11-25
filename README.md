@@ -1,12 +1,11 @@
 # VeriChain Passport - 实施完成总结
 
-## 项目状态：已完成并可运行
-
-您的 VeriChain Passport dApp 现在已经**完全可以在本地运行**，并支持 **MetaMask 钱包连接**！
+- 项目状态：已完成并可运行
+  - VeriChain Passport dApp 现在已经**完全可以在本地运行**，并支持 **MetaMask 钱包连接**！
 
 ---
 
-## 📋 已实现的功能
+## 已实现的功能
 
 ### 1. 智能合约部署
 - Hardhat 配置完成
@@ -86,7 +85,7 @@ bash setup-artifacts.sh
 
 ---
 
-## 📁 关键文件说明
+## 关键文件说明
 
 ### 配置文件:
 - `hardhat.config.cjs` - Hardhat 配置
@@ -125,15 +124,6 @@ bash setup-artifacts.sh
    - URL: http://localhost:5173
    - 支持热重载
    - 已加载合约 ABIs
-
-### 已部署的合约地址:
-
-```
-AccessControlContract: 0x0165878A594ca255338adfa4d48449f69242Eb8F
-ProductRegistry:       0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
-OwnershipManager:      0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6
-WarrantyManager:       0x8A791620dd6260079BF849Dc5567aDC3F2FdC318
-```
 
 ---
 

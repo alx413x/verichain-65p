@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { Wallet, Plus, ShoppingCart, X, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Wallet, Plus, ShoppingCart, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useContracts } from './contexts/ContractsContext';
 
 const Retailer = () => {
+  const { isConnected, isRetailer, productRegistry, ownershipManager, account } = useContracts();
+
   // --- 辅助函数：获取今天的日期 (YYYY-MM-DD) ---
   const getTodayString = () => {
     const date = new Date();
@@ -13,26 +16,9 @@ const Retailer = () => {
   };
 
   // --- 1. 初始数据 ---
-  const [inventory, setInventory] = useState([
-    {
-      id: 1,
-      serialNumber: 'SN-111',
-      model: 'Apple Watch Series 9',
-      status: 'In Stock',
-      addedDate: '2025-10-15',
-      soldDate: '-',
-      customerAddress: '-'
-    },
-    {
-      id: 2,
-      serialNumber: 'SN-222',
-      model: 'iPhone 16 Pro',
-      status: 'Sold',
-      addedDate: '2025-10-01',
-      soldDate: '2025-11-01',
-      customerAddress: '0x1234...5678'
-    }
-  ]);
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // --- 2. 弹窗状态 ---
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -50,8 +36,44 @@ const Retailer = () => {
   const [sellForm, setSellForm] = useState({ 
     serialNumber: '', 
     customerAddress: '',
-    addDate: getTodayString() // 默认今天
+    addDate: getTodayString()
   });
+
+  // --- Load inventory from blockchain ---
+  useEffect(() => {
+    if (productRegistry && ownershipManager && account && isRetailer) {
+      loadInventory();
+    }
+  }, [productRegistry, ownershipManager, account, isRetailer]);
+
+  const loadInventory = async () => {
+    try {
+      setLoading(true);
+      const ownedProducts = await ownershipManager.getProductsByOwner(account);
+      
+      const inventoryData = await Promise.all(
+        ownedProducts.map(async (serialNumber) => {
+          const details = await productRegistry.getProductDetails(serialNumber);
+          return {
+            id: serialNumber,
+            serialNumber: serialNumber,
+            model: details.model,
+            status: 'In Stock',
+            addedDate: new Date(Number(details.timestamp) * 1000).toLocaleDateString(),
+            soldDate: '-',
+            customerAddress: '-'
+          };
+        })
+      );
+      
+      setInventory(inventoryData);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading inventory:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
 
   // --- 4. 逻辑处理 ---
 
@@ -81,24 +103,37 @@ const Retailer = () => {
   };
 
   // 销售逻辑 (Register Sale)
-  const handleSell = (e) => {
+  const handleSell = async (e) => {
     e.preventDefault();
-    const updatedInventory = inventory.map(item => {
-      if (item.serialNumber === sellForm.serialNumber) {
-        return {
-          ...item,
-          status: 'Sold',
-          soldDate: sellForm.addDate, // 使用表单中的日期
-          customerAddress: sellForm.customerAddress
-        };
-      }
-      return item;
-    });
-    setInventory(updatedInventory);
-    // 重置表单 (日期重置为今天)
-    setSellForm({ serialNumber: '', customerAddress: '', addDate: getTodayString() });
-    setIsSellOpen(false);
-    triggerSuccessPopup('Sold success!!');
+    
+    // Validate address
+    if (!sellForm.customerAddress.startsWith('0x') || sellForm.customerAddress.length !== 42) {
+      alert('Please enter a valid Ethereum address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Transfer ownership to customer
+      const tx = await ownershipManager.transferOwnership(
+        sellForm.serialNumber,
+        sellForm.customerAddress
+      );
+      await tx.wait();
+
+      // Reload inventory
+      await loadInventory();
+      
+      setSellForm({ serialNumber: '', customerAddress: '', addDate: getTodayString() });
+      setIsSellOpen(false);
+      triggerSuccessPopup('Sold success!!');
+      setLoading(false);
+    } catch (err) {
+      console.error('Sale failed:', err);
+      alert(`Sale failed: ${err.message}`);
+      setLoading(false);
+    }
   };
 
   return (
@@ -125,13 +160,31 @@ const Retailer = () => {
 
         {/* Action Cards */}
         <div className="flex flex-wrap gap-8 justify-center lg:justify-start lg:ml-[83px] mb-16">
-          <div onClick={() => setIsRegisterOpen(true)} className="w-[678px] h-[190px] bg-white shadow-md rounded-lg flex flex-col justify-center px-[75px] gap-2 cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all group">
-            <h2 className="text-[40px] font-bold group-hover:text-[#0C86DE] transition-colors flex items-center gap-4"><Plus size={40} /> Register Product</h2>
+          <div 
+            onClick={() => isRetailer && setIsRegisterOpen(true)} 
+            className={`w-[678px] h-[190px] bg-white shadow-md rounded-lg flex flex-col justify-center px-[75px] gap-2 transition-all group ${
+              isRetailer ? 'cursor-pointer hover:shadow-lg hover:scale-[1.01]' : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <h2 className={`text-[40px] font-bold transition-colors flex items-center gap-4 ${
+              isRetailer ? 'group-hover:text-[#0C86DE]' : 'text-gray-400'
+            }`}>
+              <Plus size={40} /> Register Product
+            </h2>
             <p className="text-[25px] font-medium text-black/70">Add new product to inventory</p>
           </div>
 
-          <div onClick={() => setIsSellOpen(true)} className="w-[678px] h-[190px] bg-white shadow-md rounded-lg flex flex-col justify-center px-[75px] gap-2 cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all group">
-            <h2 className="text-[40px] font-bold group-hover:text-green-600 transition-colors flex items-center gap-4"><ShoppingCart size={40} /> Sell Product</h2>
+          <div 
+            onClick={() => isRetailer && setIsSellOpen(true)} 
+            className={`w-[678px] h-[190px] bg-white shadow-md rounded-lg flex flex-col justify-center px-[75px] gap-2 transition-all group ${
+              isRetailer ? 'cursor-pointer hover:shadow-lg hover:scale-[1.01]' : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <h2 className={`text-[40px] font-bold transition-colors flex items-center gap-4 ${
+              isRetailer ? 'group-hover:text-green-600' : 'text-gray-400'
+            }`}>
+              <ShoppingCart size={40} /> Sell Product
+            </h2>
             <p className="text-[25px] font-medium text-black/70">Transfer ownership to customer</p>
           </div>
         </div>
@@ -149,20 +202,34 @@ const Retailer = () => {
           </div>
 
           <div className="flex flex-col gap-4">
-            {inventory.map((item) => (
-              <div key={item.id} className="bg-white w-full h-[93px] flex items-center shadow-sm rounded-lg px-8 hover:shadow-md transition-shadow">
-                <div className="w-[15%] text-[25px] font-normal">{item.serialNumber}</div>
-                <div className="w-[20%] text-[25px] font-normal text-center">{item.model}</div>
-                <div className="w-[15%] flex justify-center">
-                  <span className={`px-4 py-1 rounded-full text-[20px] font-bold border ${item.status === 'In Stock' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                    {item.status}
-                  </span>
+            {loading ? (
+              <div className="w-full h-[200px] bg-white rounded-lg flex items-center justify-center shadow-sm">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading inventory...</p>
                 </div>
-                <div className="w-[15%] text-[25px] font-normal text-center">{item.addedDate}</div>
-                <div className="w-[15%] text-[25px] font-normal text-center text-gray-500">{item.soldDate}</div>
-                <div className="w-[20%] text-[25px] font-normal text-center text-gray-500 truncate px-2">{item.customerAddress}</div>
               </div>
-            ))}
+            ) : inventory.length === 0 ? (
+              <div className="w-full h-[200px] bg-white rounded-lg flex flex-col items-center justify-center text-gray-400 text-xl shadow-sm">
+                <p>No products in inventory</p>
+                <p className="text-sm mt-2">Products from manufacturer will appear here</p>
+              </div>
+            ) : (
+              inventory.map((item) => (
+                <div key={item.id} className="bg-white w-full h-[93px] flex items-center shadow-sm rounded-lg px-8 hover:shadow-md transition-shadow">
+                  <div className="w-[15%] text-[25px] font-normal">{item.serialNumber}</div>
+                  <div className="w-[20%] text-[25px] font-normal text-center">{item.model}</div>
+                  <div className="w-[15%] flex justify-center">
+                    <span className={`px-4 py-1 rounded-full text-[20px] font-bold border ${item.status === 'In Stock' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <div className="w-[15%] text-[25px] font-normal text-center">{item.addedDate}</div>
+                  <div className="w-[15%] text-[25px] font-normal text-center text-gray-500">{item.soldDate}</div>
+                  <div className="w-[20%] text-[25px] font-normal text-center text-gray-500 truncate px-2">{item.customerAddress}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </main>
