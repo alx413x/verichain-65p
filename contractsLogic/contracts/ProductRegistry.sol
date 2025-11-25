@@ -10,11 +10,14 @@ import "./AccessControl.sol";
 contract ProductRegistry {
     AccessControlContract public accessControl;
 
+    enum State { Manufactured, Sold, WarrantyActive, WarrantyExpired }
+   
+    // Optimized Warrenty struct
     struct Warranty {
-        uint256 startDate;
-        uint256 expiration;
-        uint256 claimCount;
-        uint256 maxCount;
+        uint256 startDate;      
+        uint256 expiration;     
+        uint256 claimCount;      
+        uint256 maxCount;       
     }
 
     struct Product {
@@ -25,6 +28,7 @@ contract ProductRegistry {
         Warranty warranty;
         bool exists;
         address owner;
+        State state;
     }
 
     mapping(bytes32 => Product) private products;
@@ -51,10 +55,7 @@ contract ProductRegistry {
     ) external {
         bytes32 key = keccak256(abi.encodePacked(serialNumber));
         require(!products[key].exists, "Already registered");
-
-        // Only a manufacturer role may register products
-        require(accessControl.hasRole(accessControl.MANUFACTURER_ROLE(), msg.sender), "Not manufacturer");
-
+        
         // Use caller as manufacturer to prevent spoofing
         products[key] = Product({
             serialNumber: serialNumber,
@@ -63,7 +64,8 @@ contract ProductRegistry {
             timestamp: block.timestamp,
             warranty: Warranty(0, 0, 0, 0),
             exists: true,
-            owner: msg.sender
+            owner: msg.sender,
+            state: State.Manufactured
         });
 
         emit ProductRegistered(serialNumber, model, msg.sender, block.timestamp, msg.sender);
@@ -122,6 +124,12 @@ contract ProductRegistry {
         );
 
         products[key].owner = newOwner;
+        
+        // Update state based on new owner's role
+        if (accessControl.hasRole(accessControl.CUSTOMER_ROLE(), newOwner)) {
+            products[key].state = State.Sold;
+        }
+        
         emit OwnershipUpdated(serialNumber, oldOwner, newOwner);
     }
 

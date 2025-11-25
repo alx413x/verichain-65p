@@ -33,6 +33,7 @@ contract WarrantyManager {
         address reviewedBy;
         uint256 reviewDate;
         string reviewReason;  // Reason for approval/rejection by service center
+        uint256 claimIndex;   // Add this field
     }
 
     mapping(bytes32 => ClaimReview[]) private reviews;
@@ -64,9 +65,15 @@ contract WarrantyManager {
     {
         require(registry.isWarrantyActive(serialNumber), "Warranty inactive");
         
-        // Verify the product exists and customer might own it
+        // Verify the product exists and customer is the owner
         address productOwner = registry.getCurrentOwner(serialNumber);
         require(productOwner != address(0), "Product not found");
+        require(productOwner == msg.sender, "Not the product owner");
+
+        // Check if claim count has reached maximum
+        uint256 currentClaimCount = registry.getWarrantyClaimCount(serialNumber);
+        ProductRegistry.Product memory product = registry.getProductDetails(serialNumber);
+        require(currentClaimCount < product.warranty.maxCount, "Maximum claim count reached");
 
         bytes32 key = keccak256(abi.encodePacked(serialNumber));
 
@@ -100,7 +107,8 @@ contract WarrantyManager {
                 status: ClaimStatus.Pending,
                 reviewedBy: address(0),
                 reviewDate: 0,
-                reviewReason: ""
+                reviewReason: "",
+                claimIndex: reviews[key].length - 1
             })
         );
 
@@ -148,6 +156,7 @@ contract WarrantyManager {
                 allClaims[i].reviewedBy = msg.sender;
                 allClaims[i].reviewDate = block.timestamp;
                 allClaims[i].reviewReason = reviewReason;
+                allClaims[i].claimIndex = claimIndex;  // Add this
                 break;
             }
         }

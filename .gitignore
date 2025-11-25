@@ -7,6 +7,12 @@ contractsLogic/artifacts/
 cache/
 artifacts/
 
+# Deployed contract addresses and ABIs (generated on each deploy)
+contractsLogic/doc/deployed.json
+contractsLogic/doc/abis/
+public/deployed.json
+public/abis/
+
 # Environment variables
 .env
 .env.local
