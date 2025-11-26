@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Wallet, Plus, ArrowRightLeft, X, CheckCircle, Box, CheckSquare, Square, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useContracts } from './contexts/ContractsContext';
+import { useToast } from './contexts/ToastContext';
+import { parseError, formatGasEstimate } from './utils/errorHandler';
 
 const Manufacturer = () => {
   const { 
@@ -10,8 +12,10 @@ const Manufacturer = () => {
     productRegistry, 
     ownershipManager,
     isConnected,
-    latestEvent
+    latestEvent,
+    provider
   } = useContracts();
+  const toast = useToast();
 
   // --- 1. 状态管理 ---
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -27,13 +31,23 @@ const Manufacturer = () => {
     serialNumber: '',
     model: '',
     warranty: '',
-    allowedClaims: ''
+    allowedClaims: '',
+    icon: '📦' // Default icon
   });
+  const [registerGasEstimate, setRegisterGasEstimate] = useState(null);
+
+  // Available product icons
+  const productIcons = [
+    '📦', '📱', '💻', '⌚', '🎧', '📷', '🖥️', '⌨️', 
+    '🖱️', '🎮', '📺', '🔋', '💡', '🔌', '🎵', '📻',
+    '🚗', '🏍️', '🚲', '⚡', '🔧', '🔨', '⚙️', '🛠️'
+  ];
 
   // Transfer Form
   const [transferAddress, setTransferAddress] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [addressError, setAddressError] = useState('');
+  const [transferGasEstimate, setTransferGasEstimate] = useState(null);
 
   // --- 2. Load products from blockchain ---
   useEffect(() => {
@@ -83,7 +97,8 @@ const Manufacturer = () => {
       setLoading(false);
     } catch (err) {
       console.error('Error loading products:', err);
-      setError(err.message);
+      const errorInfo = parseError(err);
+      toast.error(`${errorInfo.title}: ${errorInfo.message}`);
       setLoading(false);
     }
   };
@@ -116,6 +131,7 @@ const Manufacturer = () => {
         registerForm.model
       );
       await tx1.wait();
+      toast.success('Product registered successfully!');
 
       // 2. Create warranty if specified
       if (registerForm.warranty && registerForm.allowedClaims) {
@@ -125,22 +141,30 @@ const Manufacturer = () => {
           registerForm.allowedClaims
         );
         await tx2.wait();
+        toast.success('Warranty created successfully!');
       }
 
       // 3. Sync ownership
       const tx3 = await ownershipManager.syncOwnership(registerForm.serialNumber);
       await tx3.wait();
+      toast.success('Ownership synced successfully!');
+
+      // 4. Save icon to localStorage
+      const iconMap = JSON.parse(localStorage.getItem('productIcons') || '{}');
+      iconMap[registerForm.serialNumber] = registerForm.icon;
+      localStorage.setItem('productIcons', JSON.stringify(iconMap));
 
       setIsRegisterOpen(false);
-      setRegisterForm({ serialNumber: '', model: '', warranty: '', allowedClaims: '' });
-      triggerSuccessPopup('Product Registered Successfully!');
+      setRegisterForm({ serialNumber: '', model: '', warranty: '', allowedClaims: '', icon: '📦' });
+      setRegisterGasEstimate(null);
       
       // Reload products
       await loadProducts();
       setLoading(false);
     } catch (err) {
       console.error('Registration failed:', err);
-      alert(`Registration failed: ${err.message}`);
+      const errorInfo = parseError(err);
+      toast.error(`${errorInfo.title}: ${errorInfo.message}`);
       setLoading(false);
     }
   };
@@ -154,6 +178,60 @@ const Manufacturer = () => {
     }
   };
 
+  // Estimate gas for registration
+  useEffect(() => {
+    const estimateRegisterGas = async () => {
+      if (!productRegistry || !registerForm.serialNumber || !registerForm.model || !provider) {
+        setRegisterGasEstimate(null);
+        return;
+      }
+
+      try {
+        const gasLimit = await productRegistry.registerProduct.estimateGas(
+          registerForm.serialNumber,
+          registerForm.model
+        );
+        const feeData = await provider.getFeeData();
+        const estimate = formatGasEstimate(gasLimit, feeData.gasPrice || feeData.maxFeePerGas);
+        setRegisterGasEstimate(estimate);
+      } catch (err) {
+        setRegisterGasEstimate(null);
+      }
+    };
+
+    estimateRegisterGas();
+  }, [registerForm.serialNumber, registerForm.model, productRegistry, provider]);
+
+  // Estimate gas for transfer
+  useEffect(() => {
+    const estimateTransferGas = async () => {
+      if (!ownershipManager || selectedProductIds.length === 0 || !transferAddress || !provider) {
+        setTransferGasEstimate(null);
+        return;
+      }
+
+      if (!transferAddress.startsWith('0x') || transferAddress.length !== 42) {
+        setTransferGasEstimate(null);
+        return;
+      }
+
+      try {
+        const gasLimit = await ownershipManager.transferOwnership.estimateGas(
+          selectedProductIds[0],
+          transferAddress
+        );
+        const feeData = await provider.getFeeData();
+        const estimatePerProduct = formatGasEstimate(gasLimit, feeData.gasPrice || feeData.maxFeePerGas);
+        const totalEstimate = (parseFloat(estimatePerProduct) * selectedProductIds.length).toFixed(4);
+        setTransferGasEstimate(totalEstimate);
+      } catch (err) {
+        setTransferGasEstimate(null);
+      }
+    };
+
+    estimateTransferGas();
+  }, [selectedProductIds, transferAddress, ownershipManager, provider]);
+
   const handleTransfer = async () => {
     // Validation
     if (!transferAddress.startsWith('0x') || transferAddress.length !== 42) {
@@ -161,7 +239,7 @@ const Manufacturer = () => {
       return;
     }
     if (selectedProductIds.length === 0) {
-      alert("Please select at least one product.");
+      toast.warning('Please select at least one product');
       return;
     }
 
@@ -178,14 +256,16 @@ const Manufacturer = () => {
       setIsTransferOpen(false);
       setTransferAddress('');
       setSelectedProductIds([]);
-      triggerSuccessPopup(`Transferred ${selectedProductIds.length} product(s) successfully!`);
+      setTransferGasEstimate(null);
+      toast.success(`Transferred ${selectedProductIds.length} product(s) successfully!`);
       
       // Reload products
       await loadProducts();
       setLoading(false);
     } catch (err) {
       console.error('Transfer failed:', err);
-      alert(`Transfer failed: ${err.message}`);
+      const errorInfo = parseError(err);
+      toast.error(`${errorInfo.title}: ${errorInfo.message}`);
       setLoading(false);
     }
   };
@@ -293,8 +373,34 @@ const Manufacturer = () => {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[13px] font-bold text-gray-600">Allowed Claims</label>
-                <input type="number" name="allowedClaims" value={registerForm.allowedClaims} onChange={handleInputChange} className="w-full h-[40px] px-3 text-[15px] bg-white border border-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-200 text-gray-800" />
+                <input type="number" name="allowedClaims" value={registerForm.allowedClaims} onChange={handleInputChange} className="w-full h-[40px] px-3 text-[15px] bg-white border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-gray-800" />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[13px] font-bold text-gray-600">Product Icon</label>
+                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 rounded-md bg-gray-50 max-h-[120px] overflow-y-auto">
+                  {productIcons.map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setRegisterForm(prev => ({ ...prev, icon }))}
+                      className={`w-10 h-10 text-2xl flex items-center justify-center rounded-md transition-all ${
+                        registerForm.icon === icon
+                          ? 'bg-blue-500 scale-110 shadow-md'
+                          : 'bg-white hover:bg-gray-100 border border-gray-200'
+                      }`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {registerGasEstimate && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-[13px] text-blue-800">
+                    <span className="font-bold">Estimated Gas:</span> ~{registerGasEstimate} ETH
+                  </p>
+                </div>
+              )}
               <div className="mt-6 flex gap-3">
                 <button type="button" onClick={() => setIsRegisterOpen(false)} className="flex-1 h-[50px] bg-[#F3F4F6] text-gray-600 text-[15px] font-medium rounded-md hover:bg-gray-200 transition-colors" disabled={loading}>Cancel</button>
                 <button type="submit" className="flex-1 h-[50px] bg-[#2563EB] text-white text-[14px] font-medium rounded-md hover:bg-blue-700 transition-colors leading-tight px-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
@@ -372,6 +478,15 @@ const Manufacturer = () => {
                 )}
               </div>
             </div>
+
+            {/* Gas Estimate */}
+            {transferGasEstimate && selectedProductIds.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <p className="text-[13px] text-blue-800">
+                  <span className="font-bold">Estimated Gas:</span> ~{transferGasEstimate} ETH
+                </p>
+              </div>
+            )}
 
             {/* Buttons */}
             <div className="flex gap-4">

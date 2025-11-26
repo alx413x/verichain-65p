@@ -1,6 +1,8 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Wallet, LogOut, Menu, X } from 'lucide-react';import { ContractsProvider, useContracts } from './contexts/ContractsContext';
+import { Wallet, LogOut, Menu, X } from 'lucide-react';
+import { ContractsProvider, useContracts } from './contexts/ContractsContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 // 引入各个页面组件
 import Home from './Home';
@@ -144,7 +146,9 @@ function App() {
   return (
     <BrowserRouter>
       <ContractsProvider>
-        <AppContent />
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
       </ContractsProvider>
     </BrowserRouter>
   );

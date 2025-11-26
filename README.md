@@ -1,4 +1,4 @@
-# VeriChain Passport - 实施完成总结
+# VeriChain Passport
 
 - 项目状态：已完成并可运行
   - VeriChain Passport dApp 现在已经**完全可以在本地运行**，并支持 **MetaMask 钱包连接**！
@@ -62,7 +62,10 @@ npm run deploy:local
 # 5. 复制 artifacts 到前端
 bash setup-artifacts.sh
 
-# 6. 启动前端开发服务器
+# 6. 分配角色
+npm run grant-roles
+
+# 7. 启动前端开发服务器
 npm run dev
 ```
 
@@ -200,48 +203,3 @@ await tx.wait(); // 等待交易确认
 3. **网络切换**:
    - 确保 MetaMask 在 "Localhost 8545" 网络
    - Chain ID 必须是 31337
-
----
-
-## 下一步建议
-
-### 后续开发:
-
-1. **连接实际合约功能**:
-   - Manufacturer 页面连接 `productRegistry.registerProduct()`
-   - Retailer 页面连接 `ownershipManager.transferOwnership()`
-   - User 页面连接 `warrantyManager.submitClaim()`
-   - Service Center 连接 `warrantyManager.approveClaim()`
-
-2. **添加角色管理**:
-   - 使用 `accessControl.hasRole()` 检查权限
-   - 根据角色显示不同界面
-
-3. **事件监听**:
-   - 监听合约事件更新 UI
-   - 实时显示交易状态
-
-4. **部署到测试网** (可选):
-   - 配置 Sepolia 网络
-   - 获取测试 ETH
-   - 更新 hardhat.config.cjs
-   - 部署到公共测试网
-
----
-
-## 总结
-
-**您的项目现在已经:**
-
-完整的本地区块链环境  
-智能合约已编译和部署  
-MetaMask 钱包完美集成  
-前端可以访问所有合约  
-UI 界面完整且美观  
-支持实时钱包连接  
-
-**可以开始:**
-- 连接 MetaMask 测试
-- 实现具体的合约交互功能
-- 根据 PRD 完善业务逻辑
-- 优化用户体验

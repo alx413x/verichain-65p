@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Check, X, AlertCircle } from 'lucide-react';
+import { Wallet, Check, X, AlertCircle, Eye, X as XClose } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useContracts } from './contexts/ContractsContext';
 
@@ -11,6 +11,10 @@ const ServiceCenter = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+
+  // --- 2. Modal state ---
+  const [selectedClaim, setSelectedClaim] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // --- 2. Load claims from blockchain ---
   useEffect(() => {
@@ -56,7 +60,7 @@ const ServiceCenter = () => {
             
             return {
               id: index,
-              claimId: index,
+              claimId: Number(claim.claimIndex), // Use the actual claim index from the contract
               serialNumber: claim.serialNumber,
               customer: claim.claimant,
               address: `${claim.claimant.slice(0, 6)}...${claim.claimant.slice(-4)}`,
@@ -119,6 +123,17 @@ const ServiceCenter = () => {
     }
   };
 
+  // --- 4. Handle view details ---
+  const handleViewDetails = (claim) => {
+    setSelectedClaim(claim);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setTimeout(() => setSelectedClaim(null), 300);
+  };
+
   return (
     <div className="w-full min-h-screen bg-[#F9FAFB] font-sans text-black relative overflow-x-hidden">
 
@@ -133,18 +148,17 @@ const ServiceCenter = () => {
 
         {/* Section Header */}
         <div className="mb-6 pl-4 border-l-4 border-[#0C86DE]">
-          <h2 className="text-[40px] font-bold text-black">Pending Warranty Claims</h2>
+          <h2 className="text-[40px] font-bold text-black">Warranty Claims</h2>
         </div>
 
         {/* ================= Claims Table ================= */}
         <div className="w-full">
           <div className="bg-white w-full h-[93px] flex items-center px-8 lg:px-[50px] shadow-sm mb-4 rounded-t-lg border-b border-gray-100">
-            <div className="w-1/6 text-[25px] font-bold text-black">Claim ID</div>
             <div className="w-1/5 text-[25px] font-bold text-black">Product S/N</div>
-            <div className="w-1/4 text-[25px] font-bold text-black text-center">Customer</div>
+            <div className="w-1/4 text-[25px] font-bold text-black text-center">Customer Address</div>
             <div className="w-1/6 text-[25px] font-bold text-black text-center">Status</div>
             <div className="w-1/6 text-[25px] font-bold text-black text-center">Date</div>
-            <div className="w-1/6 text-[25px] font-bold text-black text-right pr-8">Actions</div>
+            <div className="w-1/5 text-[25px] font-bold text-black text-right pr-8">Actions</div>
           </div>
 
           <div className="flex flex-col gap-4">
@@ -161,18 +175,9 @@ const ServiceCenter = () => {
               </div>
             ) : (
               claims.map((item) => (
-                <div key={item.id} className="bg-white w-full min-h-[126px] flex items-center px-8 lg:px-[50px] shadow-sm rounded-lg animate-fade-in hover:shadow-md transition-shadow py-4">
-                  <div className="w-1/6 text-[25px] font-normal text-black">#{item.claimId}</div>
-                  <div className="w-1/5 text-[20px] font-normal text-black">
-                    <div className="font-mono">{item.serialNumber}</div>
-                    <div className="text-[16px] text-gray-500">{item.model}</div>
-                  </div>
-                  <div className="w-1/4 text-center">
-                    <div className="text-[18px] font-mono text-gray-600">{item.address}</div>
-                    {item.reason && (
-                      <div className="text-[14px] text-gray-500 mt-1 italic">Reason: {item.reason}</div>
-                    )}
-                  </div>
+                <div key={item.id} className="bg-white w-full h-[126px] flex items-center px-8 lg:px-[50px] shadow-sm rounded-lg animate-fade-in hover:shadow-md transition-shadow">
+                  <div className="w-1/5 text-[25px] font-normal text-black">{item.serialNumber}</div>
+                  <div className="w-1/4 text-[25px] font-normal text-black text-center font-mono text-gray-600">{item.address}</div>
                   <div className="w-1/6 flex justify-center">
                     <span className={`px-4 py-2 rounded-full text-[20px] font-bold border ${
                       item.status === 'Approved' ? 'bg-green-100 text-green-700 border-green-200' :
@@ -183,31 +188,14 @@ const ServiceCenter = () => {
                     </span>
                   </div>
                   <div className="w-1/6 text-[25px] font-normal text-black text-center">{item.date}</div>
-                  <div className="w-1/6 flex justify-end gap-4 pr-4">
-                    {item.status === 'Pending' ? (
-                      isServiceCenter ? (
-                        <>
-                          <button 
-                            onClick={() => handleReject(item.claimId, item.serialNumber)}
-                            disabled={processing}
-                            className="w-[50px] h-[50px] rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <X size={30} />
-                          </button>
-                          <button 
-                            onClick={() => handleApprove(item.claimId, item.serialNumber)}
-                            disabled={processing}
-                            className="w-[50px] h-[50px] rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Check size={30} />
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-gray-400 text-[14px] font-medium italic">Requires SERVICE_CENTER role</span>
-                      )
-                    ) : (
-                      <span className="text-gray-400 text-[18px] font-medium italic">Completed</span>
-                    )}
+                  <div className="w-1/5 flex justify-end gap-4 pr-4">
+                    <button 
+                      onClick={() => handleViewDetails(item)} 
+                      className="px-4 py-2 rounded-lg bg-[#0C86DE] text-white text-[18px] font-bold flex items-center gap-2 hover:bg-blue-600 transition-all shadow-sm"
+                    >
+                      <Eye size={20} />
+                      View Details
+                    </button>
                   </div>
                 </div>
               ))
@@ -215,6 +203,108 @@ const ServiceCenter = () => {
           </div>
         </div>
       </main>
+
+      {/* ================= Claim Details Modal ================= */}
+      {isModalOpen && selectedClaim && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+          onClick={closeModal}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl max-w-2xl w-[90%] max-h-[90vh] overflow-y-auto animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-white border-b border-gray-100 px-8 py-6">
+              <h2 className="text-[32px] font-bold text-black">Claim Details</h2>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-8 py-6">
+              {/* Product Information */}
+              <div className="mb-8">
+                <h3 className="text-[24px] font-bold text-black mb-4 pb-2 border-b border-gray-200">Product Information</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-[16px] font-medium text-gray-600 mb-1">Product Model</p>
+                    <p className="text-[20px] font-normal text-black">{selectedClaim.model}</p>
+                  </div>
+                  <div>
+                    <p className="text-[16px] font-medium text-gray-600 mb-1">Serial Number</p>
+                    <p className="text-[20px] font-mono text-black font-bold">{selectedClaim.serialNumber}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Information */}
+              <div className="mb-8">
+                <h3 className="text-[24px] font-bold text-black mb-4 pb-2 border-b border-gray-200">Customer Information</h3>
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <p className="text-[16px] font-medium text-gray-600 mb-1">Customer Address</p>
+                    <p className="text-[18px] font-mono text-black">{selectedClaim.customer}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Claim Information */}
+              <div className="mb-8">
+                <h3 className="text-[24px] font-bold text-black mb-4 pb-2 border-b border-gray-200">Claim Information</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[16px] font-medium text-gray-600 mb-1">Claim Reason</p>
+                    <p className="text-[20px] font-normal text-black">{selectedClaim.reason}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-[16px] font-medium text-gray-600 mb-1">Claim Date</p>
+                      <p className="text-[20px] font-normal text-black">{selectedClaim.date}</p>
+                    </div>
+                    <div>
+                      <p className="text-[16px] font-medium text-gray-600 mb-1">Status</p>
+                      <span className={`inline-block px-4 py-2 rounded-full text-[18px] font-bold border ${
+                        selectedClaim.status === 'Approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                        selectedClaim.status === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' :
+                        'bg-yellow-100 text-yellow-700 border-yellow-200'
+                      }`}>
+                        {selectedClaim.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 border-t border-gray-100 px-8 py-6 flex gap-4">
+              {selectedClaim.status === 'Pending' && isServiceCenter && (
+                <>
+                  <button 
+                    onClick={() => {
+                      handleReject(selectedClaim.claimId, selectedClaim.serialNumber);
+                      closeModal();
+                    }}
+                    disabled={processing}
+                    className="flex-1 py-4 rounded-lg bg-red-600 text-white text-[20px] font-bold hover:bg-red-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    <X size={24} /> Reject
+                  </button>
+                  <button 
+                    onClick={() => {
+                      handleApprove(selectedClaim.claimId, selectedClaim.serialNumber);
+                      closeModal();
+                    }}
+                    disabled={processing}
+                    className="flex-1 py-4 rounded-lg bg-green-600 text-white text-[20px] font-bold hover:bg-green-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    <Check size={24} /> Approve
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
