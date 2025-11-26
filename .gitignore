@@ -10,6 +10,8 @@ artifacts/
 # Deployed contract addresses and ABIs (generated on each deploy)
 contractsLogic/doc/deployed.json
 contractsLogic/doc/abis/
+contractsLogic/deployed.json
+contractsLogic/deployed-*.json
 public/deployed.json
 public/abis/
 

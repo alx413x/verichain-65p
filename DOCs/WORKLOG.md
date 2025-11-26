@@ -384,12 +384,47 @@ Implemented real-time blockchain event listening for automatic UI updates.
 - Event cleanup on component unmount
 - Console logging for debugging
 
-### Phase 5: 优化和完善 (TODO)
+### Phase 5: 优化和完善 (COMPLETED ✅)
 
-- [ ] 错误处理优化
-- [ ] Gas 估算
-- [ ] 交易历史记录
-- [ ] 用户引导和帮助
+- [x] 错误处理优化
+  - Toast 通知系统 (success, error, warning, info)
+  - 区块链错误解析器 (交易拒绝、余额不足、网络错误等)
+  - 替换所有 alert() 为友好的 toast 通知
+- [x] Gas 估算
+  - 实时 Gas 估算显示
+  - 表单字段变化时自动更新估算
+  - 以 ETH 单位显示预估费用
+- [x] 产品图标选择
+  - 制造商注册产品时可选择 24 个 emoji 图标
+  - 图标存储在 localStorage
+  - 用户界面显示对应的产品图标
+- [ ] 交易历史记录 (未实现)
+- [ ] 用户引导和帮助 (未实现)
+
+**Phase 5 实现细节:**
+
+1. **Toast 通知系统**
+   - 文件: `src/components/Toast.jsx`, `src/contexts/ToastContext.jsx`
+   - 4 种类型: success, error, warning, info
+   - 自动消失 (默认 5 秒)
+   - 从右侧滑入动画
+
+2. **错误处理**
+   - 文件: `src/utils/errorHandler.js`
+   - 智能解析区块链错误
+   - 提供用户友好的错误消息
+   - 检测常见错误: ACTION_REJECTED, INSUFFICIENT_FUNDS, NETWORK_ERROR 等
+
+3. **Gas 估算**
+   - 应用于 Manufacturer Portal
+   - 实时计算 registerProduct 和 transferOwnership 的 gas 费用
+   - 显示格式: "Estimated Gas: ~0.0012 ETH"
+
+4. **产品图标**
+   - 24 个常用产品图标可选
+   - 8 列网格布局，选中高亮
+   - localStorage 存储映射关系
+   - 图标在 User Dashboard 和 Product Passport 中显示
 
 ### Testing the Complete Workflow
 
@@ -554,3 +589,262 @@ A: 正常情况，新部署的合约没有数据。注册第一个产品后会�
 
 **Q: Nonce 错误？**
 A: 重启 Hardhat 节点后需要在 MetaMask 重置账户（设置 → 高级 → 重置账户）
+
+---
+
+## 部署到 Sepolia 测试网
+
+### 准备工作
+
+1. **获取 Sepolia ETH**
+   - 访问 Sepolia 水龙头: https://sepoliafaucet.com/ 或 https://www.alchemy.com/faucets/ethereum-sepolia
+   - 需要一些 Sepolia ETH 用于部署合约和交易
+
+2. **获取 Alchemy/Infura API Key**
+   - 访问 https://www.alchemy.com/ 或 https://www.infura.io/
+   - 创建账户并创建一个 Sepolia 项目
+   - 复制 API Key
+
+3. **配置环境变量**
+   创建 `.env` 文件在项目根目录:
+   ```env
+   SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+   PRIVATE_KEY=your_wallet_private_key_without_0x_prefix
+   ETHERSCAN_API_KEY=your_etherscan_api_key  # 可选，用于合约验证
+   ```
+
+4. **更新 Hardhat 配置**
+   在 `contractsLogic/hardhat.config.js` 中添加 Sepolia 网络配置:
+   ```javascript
+   require("@nomicfoundation/hardhat-toolbox");
+   require('dotenv').config();
+
+   module.exports = {
+     solidity: "0.8.20",
+     networks: {
+       hardhat: {
+         chainId: 31337
+       },
+       localhost: {
+         url: "http://127.0.0.1:8545",
+         chainId: 31337
+       },
+       sepolia: {
+         url: process.env.SEPOLIA_RPC_URL || "",
+         accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+         chainId: 11155111
+       }
+     },
+     etherscan: {
+       apiKey: process.env.ETHERSCAN_API_KEY
+     }
+   };
+   ```
+
+### 部署步骤
+
+1. **部署合约到 Sepolia**
+   ```bash
+   cd contractsLogic
+   npx hardhat run scripts/deploy.js --network sepolia
+   ```
+
+   部署后会输出合约地址，例如:
+   ```
+   AccessControl deployed to: 0x1234...
+   ProductRegistry deployed to: 0x5678...
+   OwnershipManager deployed to: 0x9abc...
+   WarrantyManager deployed to: 0xdef0...
+   ```
+
+2. **保存部署信息**
+   部署脚本会自动创建 `deployed.json` 文件，包含所有合约地址
+
+3. **复制 ABI 文件**
+   ```bash
+   bash setup-artifacts.sh
+   ```
+
+4. **授予角色**
+   修改 `contractsLogic/scripts/grant-roles.js` 中的账户地址为你的 Sepolia 账户:
+   ```javascript
+   const manufacturerAddr = "0xYourManufacturerAddress";
+   const retailerAddr = "0xYourRetailerAddress";
+   const customerAddr = "0xYourCustomerAddress";
+   const serviceCenterAddr = "0xYourServiceCenterAddress";
+   ```
+
+   然后运行:
+   ```bash
+   npx hardhat run scripts/grant-roles.js --network sepolia
+   ```
+
+5. **验证合约 (可选，推荐)**
+   ```bash
+   # 验证 AccessControl
+   npx hardhat verify --network sepolia DEPLOYED_ACCESS_CONTROL_ADDRESS
+
+   # 验证 ProductRegistry
+   npx hardhat verify --network sepolia DEPLOYED_PRODUCT_REGISTRY_ADDRESS "DEPLOYED_ACCESS_CONTROL_ADDRESS"
+
+   # 验证 OwnershipManager
+   npx hardhat verify --network sepolia DEPLOYED_OWNERSHIP_MANAGER_ADDRESS "DEPLOYED_ACCESS_CONTROL_ADDRESS" "DEPLOYED_PRODUCT_REGISTRY_ADDRESS"
+
+   # 验证 WarrantyManager
+   npx hardhat verify --network sepolia DEPLOYED_WARRANTY_MANAGER_ADDRESS "DEPLOYED_ACCESS_CONTROL_ADDRESS" "DEPLOYED_PRODUCT_REGISTRY_ADDRESS"
+   ```
+
+### 前端配置
+
+1. **更新前端合约配置**
+   前端会自动读取 `deployed.json` 和 ABI 文件，无需额外配置
+
+2. **配置 MetaMask**
+   - 添加 Sepolia 测试网络（通常已内置）
+   - 切换到 Sepolia 网络
+   - 导入你用于部署的账户
+
+3. **启动前端**
+   ```bash
+   npm run dev
+   ```
+
+4. **连接钱包**
+   - 访问 http://localhost:5173
+   - 点击 "Connect Wallet"
+   - 确保 MetaMask 切换到 Sepolia 网络
+
+### 在 Etherscan 上查看
+
+部署并验证合约后，你可以在 Sepolia Etherscan 上查看:
+
+1. **访问 Sepolia Etherscan**
+   - 主页: https://sepolia.etherscan.io/
+
+2. **查看合约**
+   - 输入合约地址: https://sepolia.etherscan.io/address/YOUR_CONTRACT_ADDRESS
+   - 如果已验证，可以看到 "Contract" 标签和源代码
+
+3. **查看交易**
+   - 每次注册产品、转移所有权、提交保修等操作都会产生交易
+   - 在 Etherscan 上可以看到交易详情、Gas 费用、事件日志等
+
+4. **读取合约数据**
+   - 点击 "Read Contract" 标签
+   - 可以直接调用 view 函数查询数据
+   - 例如: `getProductDetails(serialNumber)`
+
+5. **与合约交互**
+   - 点击 "Write Contract" 标签
+   - 连接钱包后可以直接在 Etherscan 上调用合约函数
+
+### 验证合约的好处
+
+1. **源代码公开**: 任何人都可以查看合约源代码
+2. **交互界面**: Etherscan 提供友好的读写界面
+3. **事件日志**: 可以看到所有事件的详细信息
+4. **可信度**: 已验证的合约更值得信任
+
+### 注意事项
+
+1. **Gas 费用**: Sepolia 上的交易需要真实的 ETH (测试网 ETH)
+2. **交易速度**: Sepolia 区块时间约 15 秒，比本地网络慢
+3. **数据持久性**: Sepolia 上的数据会永久保存
+4. **私钥安全**: 
+   - ⚠️ **永远不要**将真实以太坊主网的私钥用于测试
+   - ⚠️ **不要**将 `.env` 文件提交到 Git
+   - 使用专门的测试账户
+
+### 部署脚本示例
+
+创建 `contractsLogic/scripts/deploy-sepolia.js`:
+```javascript
+const hre = require("hardhat");
+const fs = require('fs');
+
+async function main() {
+  console.log("Deploying contracts to Sepolia...");
+
+  // Deploy AccessControl
+  const AccessControl = await hre.ethers.getContractFactory("AccessControlContract");
+  const accessControl = await AccessControl.deploy();
+  await accessControl.waitForDeployment();
+  const accessAddr = await accessControl.getAddress();
+  console.log("AccessControl deployed to:", accessAddr);
+
+  // Deploy ProductRegistry
+  const ProductRegistry = await hre.ethers.getContractFactory("ProductRegistry");
+  const productRegistry = await ProductRegistry.deploy(accessAddr);
+  await productRegistry.waitForDeployment();
+  const registryAddr = await productRegistry.getAddress();
+  console.log("ProductRegistry deployed to:", registryAddr);
+
+  // Deploy OwnershipManager
+  const OwnershipManager = await hre.ethers.getContractFactory("OwnershipManager");
+  const ownershipManager = await OwnershipManager.deploy(accessAddr, registryAddr);
+  await ownershipManager.waitForDeployment();
+  const ownershipAddr = await ownershipManager.getAddress();
+  console.log("OwnershipManager deployed to:", ownershipAddr);
+
+  // Deploy WarrantyManager
+  const WarrantyManager = await hre.ethers.getContractFactory("WarrantyManager");
+  const warrantyManager = await WarrantyManager.deploy(accessAddr, registryAddr);
+  await warrantyManager.waitForDeployment();
+  const warrantyAddr = await warrantyManager.getAddress();
+  console.log("WarrantyManager deployed to:", warrantyAddr);
+
+  // Set manager addresses
+  await productRegistry.setOwnershipManager(ownershipAddr);
+  await productRegistry.setWarrantyManager(warrantyAddr);
+  console.log("Manager addresses set in ProductRegistry");
+
+  // Save deployment info
+  const deployment = {
+    network: "sepolia",
+    chainId: 11155111,
+    contracts: {
+      AccessControl: accessAddr,
+      ProductRegistry: registryAddr,
+      OwnershipManager: ownershipAddr,
+      WarrantyManager: warrantyAddr
+    },
+    timestamp: new Date().toISOString(),
+    etherscan: {
+      AccessControl: `https://sepolia.etherscan.io/address/${accessAddr}`,
+      ProductRegistry: `https://sepolia.etherscan.io/address/${registryAddr}`,
+      OwnershipManager: `https://sepolia.etherscan.io/address/${ownershipAddr}`,
+      WarrantyManager: `https://sepolia.etherscan.io/address/${warrantyAddr}`
+    }
+  };
+
+  fs.writeFileSync(
+    './deployed-sepolia.json',
+    JSON.stringify(deployment, null, 2)
+  );
+
+  console.log("\n=== Deployment Complete ===");
+  console.log("\nView contracts on Etherscan:");
+  console.log(`AccessControl: ${deployment.etherscan.AccessControl}`);
+  console.log(`ProductRegistry: ${deployment.etherscan.ProductRegistry}`);
+  console.log(`OwnershipManager: ${deployment.etherscan.OwnershipManager}`);
+  console.log(`WarrantyManager: ${deployment.etherscan.WarrantyManager}`);
+  console.log("\nNext steps:");
+  console.log("1. Run: bash setup-artifacts.sh");
+  console.log("2. Update grant-roles.js with your account addresses");
+  console.log("3. Run: npx hardhat run scripts/grant-roles.js --network sepolia");
+  console.log("4. Verify contracts (optional but recommended)");
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+```
+
+使用:
+```bash
+cd contractsLogic
+npx hardhat run scripts/deploy-sepolia.js --network sepolia
+```
