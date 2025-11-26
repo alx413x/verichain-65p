@@ -25,19 +25,46 @@ const Home = () => {
       // Try to get product from blockchain
       const productDetails = await productRegistry.getProductDetails(searchQuery.trim());
       
+      // Load icon from localStorage
+      const iconMap = JSON.parse(localStorage.getItem('productIcons') || '{}');
+      const productIcon = iconMap[searchQuery.trim()] || '📦';
+      
+      // Calculate warranty status
+      const now = Math.floor(Date.now() / 1000);
+      const warrantyExpiration = Number(productDetails.warranty.expiration);
+      const warrantyStartDate = Number(productDetails.warranty.startDate);
+      const isExpired = warrantyExpiration > 0 && now > warrantyExpiration;
+      const hasWarranty = warrantyStartDate > 0;
+      
+      // Calculate claims
+      const maxClaims = Number(productDetails.warranty.maxCount) || 0;
+      const usedClaims = Number(productDetails.warranty.claimCount) || 0;
+      const claimsRemaining = maxClaims - usedClaims;
+      
       // If product exists, navigate to passport page
-      if (productDetails && productDetails.model) {
+      if (productDetails && productDetails.exists) {
         navigate('/passport', { 
           state: { 
             product: {
               sn: searchQuery.trim(),
               serialNumber: searchQuery.trim(),
               model: productDetails.model,
-              manufacturer: 'Manufacturer',
-              owner: productDetails.currentOwner,
-              warrantyStatus: productDetails.warranty.isActive ? 'Active' : 'Expired',
-              warrantyEnd: new Date(Number(productDetails.warranty.expiration) * 1000).toLocaleDateString(),
-              claimsLeft: `${productDetails.warranty.remainingCount}/${productDetails.warranty.totalAllowed}`,
+              manufacturer: productDetails.manufacturer,
+              owner: productDetails.owner,
+              image: productIcon,
+              warrantyStatus: hasWarranty ? (isExpired ? 'Expired' : 'Active') : 'No Warranty',
+              warrantyEnd: warrantyExpiration > 0 ? new Date(warrantyExpiration * 1000).toLocaleDateString() : 'N/A',
+              claimsLeft: hasWarranty ? `${claimsRemaining}/${maxClaims}` : 'N/A',
+              history: [
+                {
+                  date: new Date(Number(productDetails.timestamp) * 1000).toLocaleDateString(),
+                  desc: 'Product Registered'
+                },
+                ...(hasWarranty ? [{
+                  date: new Date(warrantyStartDate * 1000).toLocaleDateString(),
+                  desc: 'Warranty Activated'
+                }] : [])
+              ]
             }
           } 
         });
