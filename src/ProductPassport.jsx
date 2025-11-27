@@ -44,7 +44,10 @@ const ProductPassport = () => {
         
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 rounded-t-2xl flex items-center justify-between">
-          <h2 className="text-[28px] font-bold text-gray-900">Product Passport</h2>
+          <div className="flex items-center gap-4">
+            <img src="/vite.svg" alt="dApp Logo" className="h-8 w-auto" />
+            <h2 className="text-[28px] font-bold text-gray-900">Product Passport</h2>
+          </div>
           <button 
             onClick={() => navigate('/')} 
             className="text-gray-400 hover:text-gray-600 transition-colors"

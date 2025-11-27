@@ -11,8 +11,32 @@ export default function useEthers() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.ethereum) {
       // handle account/network changes
-      window.ethereum.on?.('accountsChanged', (accounts) => {
-        setAccount(accounts[0] || null);
+      window.ethereum.on?.('accountsChanged', async (accounts) => {
+        if (accounts[0]) {
+          // Reinitialize provider and signer with new account
+          try {
+            const browserProvider = new ethers.BrowserProvider(window.ethereum);
+            const s = await browserProvider.getSigner();
+            const a = await s.getAddress();
+            const network = await browserProvider.getNetwork();
+            setProvider(browserProvider);
+            setSigner(s);
+            setAccount(a);
+            setChainId(network.chainId);
+          } catch (err) {
+            console.error('Error reinitializing provider:', err);
+            setProvider(null);
+            setSigner(null);
+            setAccount(null);
+            setChainId(null);
+          }
+        } else {
+          // No accounts connected
+          setProvider(null);
+          setSigner(null);
+          setAccount(null);
+          setChainId(null);
+        }
       });
       window.ethereum.on?.('chainChanged', () => {
         // reload or reinit provider on network change

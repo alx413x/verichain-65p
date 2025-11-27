@@ -60,7 +60,7 @@ const NavigationBar = () => {
     <nav className="w-full h-[100px] border-b border-black/10 bg-[#F9FAFB] px-8 lg:px-16 sticky top-0 z-50 flex items-center justify-between">
       {/* Logo */}
       <div className="flex items-center gap-4">
-        <div className="w-[72px] h-[78px] bg-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-500">Logo</div>
+        <img src="/vite.svg" alt="VeriChain Logo" className="h-16 w-auto" />
         <span className="text-[32px] lg:text-[40px] font-medium leading-tight hidden sm:block">
           VeriChain Passport
         </span>
