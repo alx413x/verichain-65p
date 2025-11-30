@@ -40,11 +40,11 @@ npm run deploy:local
 npm run grant-roles
 ```
 
-这将:
+对应行为:
 - 编译智能合约
 - 部署到本地节点
 - 授予角色
-- 生成 ABIs 和部署地址到 `contractsLogic/doc/` (下一步中)
+- 生成 ABIs 和部署地址到 `contractsLogic/doc/`
 
 #### 4. 复制合约文件到前端
 
@@ -96,8 +96,6 @@ npm run dev
 
 ### **可以在本地运行时连接 MetaMask！**
 
-**不需要部署到 Sepolia 测试网**。本地 Hardhat 节点完全支持 MetaMask 连接。
-
 ### 如何连接:
 
 1. 确保 MetaMask 已切换到 "Localhost 8545" 网络
@@ -130,25 +128,6 @@ npm run dev
 ### 4. Service Center (服务中心)
 - 审核保修申请
 - 批准/拒绝申请
-
----
-
-## 常见问题
-
-### Q: MetaMask 显示 "错误的网络"
-A: 确保切换到 "Localhost 8545" 网络
-
-### Q: 交易失败
-A: 重启 Hardhat 节点后需要:
-1. 重新部署合约 (`npm run deploy:local`)
-2. 复制新的 artifacts (`bash setup-artifacts.sh`)
-3. 在 MetaMask 中重置账户 (设置 → 高级 → 重置账户)
-
-### Q: 找不到合约地址
-A: 确保已运行 `bash setup-artifacts.sh` 复制文件到 `public/`
-
-### Q: "Failed to load artifacts"
-A: 检查 `public/deployed.json` 和 `public/abis/*.json` 是否存在
 
 ---
 
@@ -212,15 +191,4 @@ bash setup-artifacts.sh  # 复制合约文件到 public/
 - **MetaMask 账户**可能需要重置 (设置 → 高级 → 重置账户)
 - **仅用于开发**，不要在生产环境使用测试私钥
 
----
 
-## 下一步
-
-如果要部署到测试网 (Sepolia):
-
-1. 获取 Sepolia 测试 ETH (从 faucet)
-2. 配置 `.env` 文件与私钥
-3. 更新 `hardhat.config.js` 添加 Sepolia 网络
-4. 运行 `npx hardhat run scripts/deploy.js --network sepolia`
-
----
