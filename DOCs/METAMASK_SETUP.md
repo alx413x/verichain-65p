@@ -99,16 +99,3 @@ npm run chain
 ```bash
 bash setup-artifacts.sh
 ```
-
-## 测试功能
-
-连接成功后，您可以测试:
-
-1. **Manufacturer Portal** - 注册产品、转移给零售商
-2. **Retailer Portal** - 管理库存、销售给用户
-3. **User Dashboard** - 查看产品、申请保修
-4. **Service Center** - 审核保修申请
-
-每个写操作都会触发 MetaMask 签名请求！
-
----
