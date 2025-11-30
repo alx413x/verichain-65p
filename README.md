@@ -1,10 +1,5 @@
 # VeriChain Passport
 
-- 项目状态：已完成并可运行
-  - VeriChain Passport dApp 现在已经**完全可以在本地运行**，并支持 **MetaMask 钱包连接**！
-
----
-
 ## 已实现的功能
 
 ### 1. 智能合约部署
